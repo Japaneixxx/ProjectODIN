@@ -8,6 +8,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.graphics.ColorUtils
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
 import com.japaneixxx.odin.data.entity.NoteWithTags
@@ -17,17 +19,10 @@ import com.japaneixxx.odin.ui.utils.DateFormatter
 class NoteAdapter(
     private val onNoteClick: (NoteWithTags) -> Unit,
     private val onNoteLongClick: (NoteWithTags) -> Unit
-) : RecyclerView.Adapter<NoteAdapter.NoteViewHolder>() {
-
-    private var notesList = listOf<NoteWithTags>()
+) : ListAdapter<NoteWithTags, NoteAdapter.NoteViewHolder>(NoteDiffCallback) {
 
     private fun Float.dpToPx(context: Context): Float {
         return this * context.resources.displayMetrics.density
-    }
-
-    fun updateNotes(newNotes: List<NoteWithTags>) {
-        notesList = newNotes
-        notifyDataSetChanged()
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NoteViewHolder {
@@ -40,10 +35,8 @@ class NoteAdapter(
     }
 
     override fun onBindViewHolder(holder: NoteViewHolder, position: Int) {
-        holder.bind(notesList[position])
+        holder.bind(getItem(position))
     }
-
-    override fun getItemCount(): Int = notesList.size
 
     inner class NoteViewHolder(private val binding: ItemNoteBinding) :
         RecyclerView.ViewHolder(binding.root) {
@@ -57,7 +50,7 @@ class NoteAdapter(
             binding.tvUpdatedAt.text = DateFormatter.formatRelativeDate(note.updatedAt)
             binding.ivPinned.visibility = if (note.isPinned) View.VISIBLE else View.GONE
 
-            // Limpa os chips antigos
+            // Limpa e renderiza os chips das tags
             binding.cgNoteTags.removeAllViews()
 
             if (tags.isNotEmpty()) {
@@ -80,12 +73,15 @@ class NoteAdapter(
                     binding.cgNoteTags.addView(chip)
                 }
             } else {
-                // Esconde o grupo de chips e o ConstraintLayout ajusta a data diretamente
                 binding.cgNoteTags.visibility = View.GONE
             }
 
-            // Listeners de clique
-            binding.root.setOnClickListener { onNoteClick(noteWithTags) }
+            // Clique rápido: abre edição
+            binding.root.setOnClickListener {
+                onNoteClick(noteWithTags)
+            }
+
+            // Clique longo: alterna pin com feedback tátil
             binding.root.setOnLongClickListener { view ->
                 view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                 onNoteLongClick(noteWithTags)
@@ -93,16 +89,24 @@ class NoteAdapter(
             }
         }
 
-        // Função de estilo no nível do NoteViewHolder
         private fun applyTagColor(chip: Chip, colorHex: String) {
             try {
                 val parsedColor = Color.parseColor(colorHex)
                 chip.chipBackgroundColor = ColorStateList.valueOf(parsedColor)
                 val isDark = ColorUtils.calculateLuminance(parsedColor) < 0.5
                 chip.setTextColor(if (isDark) Color.WHITE else Color.BLACK)
-            } catch (_: Exception) {
-                // Fallback silencioso em caso de hex inválido
-            }
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Callback responsável por calcular diferenças entre listas de forma reativa
+    object NoteDiffCallback : DiffUtil.ItemCallback<NoteWithTags>() {
+        override fun areItemsTheSame(oldItem: NoteWithTags, newItem: NoteWithTags): Boolean {
+            return oldItem.note.id == newItem.note.id
+        }
+
+        override fun areContentsTheSame(oldItem: NoteWithTags, newItem: NoteWithTags): Boolean {
+            return oldItem == newItem
         }
     }
 }
