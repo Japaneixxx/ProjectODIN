@@ -76,9 +76,16 @@ jobs:
 
           mkdir -p dist
           release_body_file="dist/release-body.txt"
+          release_files="dist/release-files.txt"
           : > "$release_body_file"
+          : > "$release_files"
           echo "APKs gerados automaticamente:" >> "$release_body_file"
           release_version=""
+          target_release_version=""
+
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
+            target_release_version="${GITHUB_REF_NAME#v}"
+          fi
 
           while IFS= read -r module_dir; do
             [[ -z "$module_dir" ]] && continue
@@ -97,11 +104,13 @@ jobs:
             fi
             [[ -z "$version_code" ]] && version_code="0"
 
+            if [[ -n "$target_release_version" && "$version_name" != "$target_release_version" ]]; then
+              echo "Ignorando $module_dir: versão $version_name não corresponde à tag v$target_release_version."
+              continue
+            fi
+
             if [[ -z "$release_version" ]]; then
               release_version="$version_name"
-            elif [[ "$release_version" != "$version_name" ]]; then
-              echo "Versões divergentes entre módulos Android: $release_version e $version_name"
-              exit 1
             fi
 
             apk_path=$(find "$module_dir/build/outputs/apk/release" -type f -name "*.apk" | head -n 1)
@@ -114,12 +123,16 @@ jobs:
             artifact_path="dist/${module_slug}-v${version_name}+${version_code}.apk"
             cp "$apk_path" "$artifact_path"
 
-            echo "$artifact_path" >> dist/release-files.txt
+            echo "$artifact_path" >> "$release_files"
             echo "- $module_slug v$version_name (code $version_code)" >> "$release_body_file"
           done <<< "${{ steps.discover.outputs.modules }}"
 
           if [[ -z "$release_version" ]]; then
-            echo "Não foi possível definir a versão da release."
+            if [[ -n "$target_release_version" ]]; then
+              echo "Nenhum módulo Android com versão v$target_release_version foi encontrado para release."
+            else
+              echo "Não foi possível definir a versão da release."
+            fi
             exit 1
           fi
 
@@ -129,7 +142,7 @@ jobs:
           fi
 
           echo "files<<EOF" >> "$GITHUB_OUTPUT"
-          cat dist/release-files.txt >> "$GITHUB_OUTPUT"
+          cat "$release_files" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
           echo "release_body<<EOF" >> "$GITHUB_OUTPUT"
