@@ -1,0 +1,91 @@
+name: Build and Release APKs
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag da release (ex: v1.4.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release APKs
+        run: ./gradlew :notes:assembleRelease :wiki:assembleRelease
+
+      - name: Extract app versions
+        id: versions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          notes_version_name=$(sed -n 's/.*versionName "\(.*\)".*/\1/p' notes/build.gradle | head -n 1)
+          notes_version_code=$(sed -n 's/.*versionCode \([0-9]\+\).*/\1/p' notes/build.gradle | head -n 1)
+          wiki_version_name=$(sed -n 's/.*versionName "\(.*\)".*/\1/p' wiki/build.gradle | head -n 1)
+          wiki_version_code=$(sed -n 's/.*versionCode \([0-9]\+\).*/\1/p' wiki/build.gradle | head -n 1)
+
+          echo "notes_version_name=$notes_version_name" >> "$GITHUB_OUTPUT"
+          echo "notes_version_code=$notes_version_code" >> "$GITHUB_OUTPUT"
+          echo "wiki_version_name=$wiki_version_name" >> "$GITHUB_OUTPUT"
+          echo "wiki_version_code=$wiki_version_code" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare release artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist
+          notes_apk=$(find notes/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
+          wiki_apk=$(find wiki/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
+
+          cp "$notes_apk" "dist/notes-v${{ steps.versions.outputs.notes_version_name }}+${{ steps.versions.outputs.notes_version_code }}.apk"
+          cp "$wiki_apk" "dist/wiki-v${{ steps.versions.outputs.wiki_version_name }}+${{ steps.versions.outputs.wiki_version_code }}.apk"
+
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "dist/notes-v${{ steps.versions.outputs.notes_version_name }}+${{ steps.versions.outputs.notes_version_code }}.apk" >> "$GITHUB_OUTPUT"
+          echo "dist/wiki-v${{ steps.versions.outputs.wiki_version_name }}+${{ steps.versions.outputs.wiki_version_code }}.apk" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF:-}" == refs/tags/* ]]; then
+            echo "value=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub release with APKs
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          name: Release ${{ steps.tag.outputs.value }}
+          body: |
+            APKs gerados automaticamente:
+            - notes v${{ steps.versions.outputs.notes_version_name }} (code ${{ steps.versions.outputs.notes_version_code }})
+            - wiki v${{ steps.versions.outputs.wiki_version_name }} (code ${{ steps.versions.outputs.wiki_version_code }})
+          files: ${{ steps.artifacts.outputs.files }}
