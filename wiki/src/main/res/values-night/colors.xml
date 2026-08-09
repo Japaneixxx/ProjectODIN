@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Asgard Night - Dark Theme -->
+    <color name="odin_background">#0E1217</color>
+    <color name="odin_surface">#1A202C</color>
+    <color name="odin_surface_variant">#2D3748</color>
+
+    <color name="odin_gold">#FFB800</color>
+    <color name="odin_cyan">#00E5FF</color>
+
+    <color name="odin_primary">#7AA2F7</color>
+    <color name="odin_on_primary">#0F141D</color>
+    <color name="odin_secondary">#BB9AF7</color>
+    <color name="odin_text_primary">#F1F5F9</color>
+    <color name="odin_text_secondary">#94A3B8</color>
+</resources>

@@ -1,10 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Identidade Visual ODIN - Light Theme (Alfheim) -->
+    <color name="odin_background">#F8FAFC</color>
+    <color name="odin_surface">#FFFFFF</color>
+    <color name="odin_surface_variant">#E2E8F0</color>
+
+    <!-- Destaques Nórdicos (Ajustados para Contraste Claro) -->
+    <color name="odin_gold">#D97706</color>
+    <color name="odin_cyan">#0284C7</color>
+
+    <!-- Cores de Texto e UI -->
+    <color name="odin_primary">#7AA2F7</color>
+    <color name="odin_on_primary">#0F141D</color>
+    <color name="odin_secondary">#BB9AF7</color>
+
+<!--    <color name="odin_primary">#D97706</color>-->
+<!--    <color name="odin_on_primary">#FFFFFF</color>-->
+    <color name="odin_text_primary">#0F172A</color>
+    <color name="odin_text_secondary">#64748B</color>
+
+    <!-- Paleta de Tags (Funciona bem em ambos) -->
+    <color name="tag_valhalla_red">#E53E3E</color>
+    <color name="tag_bifrost_cyan">#00B5D8</color>
+    <color name="tag_yggdrasil_green">#38A169</color>
+    <color name="tag_runic_purple">#805AD5</color>
+    <color name="tag_asgard_gold">#D69E2E</color>
 </resources>
