@@ -80,7 +80,6 @@ jobs:
           releases_file="dist/releases.tsv"
           : > "$releases_file"
           target_release_version=""
-          short_sha="${GITHUB_SHA::7}"
 
           if [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
             target_release_version="${GITHUB_REF_NAME#v}"
@@ -118,15 +117,17 @@ jobs:
             artifact_path="dist/${module_slug}-v${version_name}+${version_code}.apk"
             cp "$apk_path" "$artifact_path"
 
-            release_tag="apk-${module_slug}-v${version_name}-c${version_code}-${short_sha}"
+            release_tag="apk-${module_slug}-v${version_name}"
+            legacy_release_prefix="apk-${module_slug}-v${version_name}-c"
             release_name="Release ${module_slug} v${version_name} (${version_code})"
             release_body="APK gerado automaticamente do commit ${GITHUB_SHA}."
 
-            printf '%s\t%s\t%s\t%s\n' \
+            printf '%s\t%s\t%s\t%s\t%s\n' \
               "$artifact_path" \
               "$release_tag" \
               "$release_name" \
-              "$release_body" >> "$releases_file"
+              "$release_body" \
+              "$legacy_release_prefix" >> "$releases_file"
           done <<< "${{ steps.discover.outputs.modules }}"
 
           if [[ ! -s "$releases_file" ]]; then
@@ -149,8 +150,30 @@ jobs:
         run: |
           set -euo pipefail
 
-          while IFS=$'\t' read -r artifact_path release_tag release_name release_body; do
+          mapfile -t existing_release_tags < <(gh release list --limit 1000 --json tagName --jq '.[].tagName')
+
+          release_already_exists() {
+            local target_tag="$1"
+            local legacy_prefix="$2"
+            local existing_tag
+
+            for existing_tag in "${existing_release_tags[@]}"; do
+              if [[ "$existing_tag" == "$target_tag" || "$existing_tag" == "${legacy_prefix}"* ]]; then
+                return 0
+              fi
+            done
+
+            return 1
+          }
+
+          while IFS=$'\t' read -r artifact_path release_tag release_name release_body legacy_release_prefix; do
             [[ -z "${artifact_path:-}" ]] && continue
+
+            if release_already_exists "$release_tag" "$legacy_release_prefix"; then
+              echo "Ignorando release ${release_tag}: versão já publicada."
+              continue
+            fi
+
             gh release create "$release_tag" "$artifact_path" \
               --title "$release_name" \
               --notes "$release_body" \
