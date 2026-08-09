@@ -5,11 +5,6 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: "Tag da release (ex: v1.4.0)"
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -83,6 +78,7 @@ jobs:
           release_body_file="dist/release-body.txt"
           : > "$release_body_file"
           echo "APKs gerados automaticamente:" >> "$release_body_file"
+          release_version=""
 
           while IFS= read -r module_dir; do
             [[ -z "$module_dir" ]] && continue
@@ -95,8 +91,18 @@ jobs:
             version_name=$(sed -nE "s/.*versionName[[:space:]]+[\"']([^\"']+)[\"'].*/\1/p" "$build_file" | head -n 1)
             version_code=$(sed -nE "s/.*versionCode[[:space:]]+([0-9]+).*/\1/p" "$build_file" | head -n 1)
 
-            [[ -z "$version_name" ]] && version_name="unknown"
+            if [[ -z "$version_name" ]]; then
+              echo "versionName não encontrado em $build_file"
+              exit 1
+            fi
             [[ -z "$version_code" ]] && version_code="0"
+
+            if [[ -z "$release_version" ]]; then
+              release_version="$version_name"
+            elif [[ "$release_version" != "$version_name" ]]; then
+              echo "Versões divergentes entre módulos Android: $release_version e $version_name"
+              exit 1
+            fi
 
             apk_path=$(find "$module_dir/build/outputs/apk/release" -type f -name "*.apk" | head -n 1)
             if [[ -z "$apk_path" ]]; then
@@ -112,6 +118,16 @@ jobs:
             echo "- $module_slug v$version_name (code $version_code)" >> "$release_body_file"
           done <<< "${{ steps.discover.outputs.modules }}"
 
+          if [[ -z "$release_version" ]]; then
+            echo "Não foi possível definir a versão da release."
+            exit 1
+          fi
+
+          release_tag="$release_version"
+          if [[ "$release_tag" != v* ]]; then
+            release_tag="v$release_tag"
+          fi
+
           echo "files<<EOF" >> "$GITHUB_OUTPUT"
           cat dist/release-files.txt >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -119,22 +135,13 @@ jobs:
           echo "release_body<<EOF" >> "$GITHUB_OUTPUT"
           cat "$release_body_file" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Resolve release tag
-        id: tag
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${GITHUB_REF:-}" == refs/tags/* ]]; then
-            echo "value=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          else
-            echo "value=${{ github.event.inputs.release_tag }}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release with APKs
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.value }}
-          name: Release ${{ steps.tag.outputs.value }}
+          tag_name: ${{ steps.artifacts.outputs.release_tag }}
+          name: Release ${{ steps.artifacts.outputs.release_tag }}
           body: ${{ steps.artifacts.outputs.release_body }}
           files: ${{ steps.artifacts.outputs.files }}
