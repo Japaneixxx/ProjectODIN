@@ -31,24 +31,47 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build release APKs
-        run: ./gradlew :notes:assembleRelease :wiki:assembleRelease
-
-      - name: Extract app versions
-        id: versions
+      - name: Discover Android app modules
+        id: discover
         shell: bash
         run: |
           set -euo pipefail
 
-          notes_version_name=$(sed -n 's/.*versionName "\(.*\)".*/\1/p' notes/build.gradle | head -n 1)
-          notes_version_code=$(sed -n 's/.*versionCode \([0-9]\+\).*/\1/p' notes/build.gradle | head -n 1)
-          wiki_version_name=$(sed -n 's/.*versionName "\(.*\)".*/\1/p' wiki/build.gradle | head -n 1)
-          wiki_version_code=$(sed -n 's/.*versionCode \([0-9]\+\).*/\1/p' wiki/build.gradle | head -n 1)
+          mapfile -t declared_modules < <(
+            grep -E "^[[:space:]]*include[[:space:]]" settings.gradle \
+              | grep -oE "'[^']+'" \
+              | tr -d "'" \
+              || true
+          )
 
-          echo "notes_version_name=$notes_version_name" >> "$GITHUB_OUTPUT"
-          echo "notes_version_code=$notes_version_code" >> "$GITHUB_OUTPUT"
-          echo "wiki_version_name=$wiki_version_name" >> "$GITHUB_OUTPUT"
-          echo "wiki_version_code=$wiki_version_code" >> "$GITHUB_OUTPUT"
+          app_modules=()
+          gradle_tasks=()
+          for module_ref in "${declared_modules[@]}"; do
+            module_path="${module_ref#:}"
+            module_dir="${module_path//:/\/}"
+            build_file="$module_dir/build.gradle"
+            if [[ ! -f "$build_file" && -f "$module_dir/build.gradle.kts" ]]; then
+              build_file="$module_dir/build.gradle.kts"
+            fi
+
+            if [[ -f "$build_file" ]] && grep -Eq "com\.android\.application" "$build_file"; then
+              app_modules+=("$module_dir")
+              gradle_tasks+=("${module_ref}:assembleRelease")
+            fi
+          done
+
+          if [[ ${#app_modules[@]} -eq 0 ]]; then
+            echo "Nenhum módulo Android application foi detectado."
+            exit 1
+          fi
+
+          echo "tasks=${gradle_tasks[*]}" >> "$GITHUB_OUTPUT"
+          echo "modules<<EOF" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${app_modules[@]}" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Build release APKs
+        run: ./gradlew ${{ steps.discover.outputs.tasks }}
 
       - name: Prepare release artifacts
         id: artifacts
@@ -57,15 +80,44 @@ jobs:
           set -euo pipefail
 
           mkdir -p dist
-          notes_apk=$(find notes/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
-          wiki_apk=$(find wiki/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
+          release_body_file="dist/release-body.txt"
+          : > "$release_body_file"
+          echo "APKs gerados automaticamente:" >> "$release_body_file"
 
-          cp "$notes_apk" "dist/notes-v${{ steps.versions.outputs.notes_version_name }}+${{ steps.versions.outputs.notes_version_code }}.apk"
-          cp "$wiki_apk" "dist/wiki-v${{ steps.versions.outputs.wiki_version_name }}+${{ steps.versions.outputs.wiki_version_code }}.apk"
+          while IFS= read -r module_dir; do
+            [[ -z "$module_dir" ]] && continue
+
+            build_file="$module_dir/build.gradle"
+            if [[ ! -f "$build_file" && -f "$module_dir/build.gradle.kts" ]]; then
+              build_file="$module_dir/build.gradle.kts"
+            fi
+
+            version_name=$(sed -nE "s/.*versionName[[:space:]]+[\"']([^\"']+)[\"'].*/\1/p" "$build_file" | head -n 1)
+            version_code=$(sed -nE "s/.*versionCode[[:space:]]+([0-9]+).*/\1/p" "$build_file" | head -n 1)
+
+            [[ -z "$version_name" ]] && version_name="unknown"
+            [[ -z "$version_code" ]] && version_code="0"
+
+            apk_path=$(find "$module_dir/build/outputs/apk/release" -type f -name "*.apk" | head -n 1)
+            if [[ -z "$apk_path" ]]; then
+              echo "APK de release não encontrado para $module_dir"
+              exit 1
+            fi
+
+            module_slug="${module_dir//\//-}"
+            artifact_path="dist/${module_slug}-v${version_name}+${version_code}.apk"
+            cp "$apk_path" "$artifact_path"
+
+            echo "$artifact_path" >> dist/release-files.txt
+            echo "- $module_slug v$version_name (code $version_code)" >> "$release_body_file"
+          done <<< "${{ steps.discover.outputs.modules }}"
 
           echo "files<<EOF" >> "$GITHUB_OUTPUT"
-          echo "dist/notes-v${{ steps.versions.outputs.notes_version_name }}+${{ steps.versions.outputs.notes_version_code }}.apk" >> "$GITHUB_OUTPUT"
-          echo "dist/wiki-v${{ steps.versions.outputs.wiki_version_name }}+${{ steps.versions.outputs.wiki_version_code }}.apk" >> "$GITHUB_OUTPUT"
+          cat dist/release-files.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          echo "release_body<<EOF" >> "$GITHUB_OUTPUT"
+          cat "$release_body_file" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Resolve release tag
@@ -84,8 +136,5 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.value }}
           name: Release ${{ steps.tag.outputs.value }}
-          body: |
-            APKs gerados automaticamente:
-            - notes v${{ steps.versions.outputs.notes_version_name }} (code ${{ steps.versions.outputs.notes_version_code }})
-            - wiki v${{ steps.versions.outputs.wiki_version_name }} (code ${{ steps.versions.outputs.wiki_version_code }})
+          body: ${{ steps.artifacts.outputs.release_body }}
           files: ${{ steps.artifacts.outputs.files }}
