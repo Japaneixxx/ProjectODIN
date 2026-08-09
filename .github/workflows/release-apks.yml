@@ -1,0 +1,140 @@
+name: Build and Release APKs
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag da release (ex: v1.4.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Discover Android app modules
+        id: discover
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t declared_modules < <(
+            grep -E "^[[:space:]]*include[[:space:]]" settings.gradle \
+              | grep -oE "'[^']+'" \
+              | tr -d "'" \
+              || true
+          )
+
+          app_modules=()
+          gradle_tasks=()
+          for module_ref in "${declared_modules[@]}"; do
+            module_path="${module_ref#:}"
+            module_dir="${module_path//:/\/}"
+            build_file="$module_dir/build.gradle"
+            if [[ ! -f "$build_file" && -f "$module_dir/build.gradle.kts" ]]; then
+              build_file="$module_dir/build.gradle.kts"
+            fi
+
+            if [[ -f "$build_file" ]] && grep -Eq "com\.android\.application" "$build_file"; then
+              app_modules+=("$module_dir")
+              gradle_tasks+=("${module_ref}:assembleRelease")
+            fi
+          done
+
+          if [[ ${#app_modules[@]} -eq 0 ]]; then
+            echo "Nenhum módulo Android application foi detectado."
+            exit 1
+          fi
+
+          echo "tasks=${gradle_tasks[*]}" >> "$GITHUB_OUTPUT"
+          echo "modules<<EOF" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${app_modules[@]}" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Build release APKs
+        run: ./gradlew ${{ steps.discover.outputs.tasks }}
+
+      - name: Prepare release artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist
+          release_body_file="dist/release-body.txt"
+          : > "$release_body_file"
+          echo "APKs gerados automaticamente:" >> "$release_body_file"
+
+          while IFS= read -r module_dir; do
+            [[ -z "$module_dir" ]] && continue
+
+            build_file="$module_dir/build.gradle"
+            if [[ ! -f "$build_file" && -f "$module_dir/build.gradle.kts" ]]; then
+              build_file="$module_dir/build.gradle.kts"
+            fi
+
+            version_name=$(sed -nE "s/.*versionName[[:space:]]+[\"']([^\"']+)[\"'].*/\1/p" "$build_file" | head -n 1)
+            version_code=$(sed -nE "s/.*versionCode[[:space:]]+([0-9]+).*/\1/p" "$build_file" | head -n 1)
+
+            [[ -z "$version_name" ]] && version_name="unknown"
+            [[ -z "$version_code" ]] && version_code="0"
+
+            apk_path=$(find "$module_dir/build/outputs/apk/release" -type f -name "*.apk" | head -n 1)
+            if [[ -z "$apk_path" ]]; then
+              echo "APK de release não encontrado para $module_dir"
+              exit 1
+            fi
+
+            module_slug="${module_dir//\//-}"
+            artifact_path="dist/${module_slug}-v${version_name}+${version_code}.apk"
+            cp "$apk_path" "$artifact_path"
+
+            echo "$artifact_path" >> dist/release-files.txt
+            echo "- $module_slug v$version_name (code $version_code)" >> "$release_body_file"
+          done <<< "${{ steps.discover.outputs.modules }}"
+
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          cat dist/release-files.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          echo "release_body<<EOF" >> "$GITHUB_OUTPUT"
+          cat "$release_body_file" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF:-}" == refs/tags/* ]]; then
+            echo "value=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ github.event.inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub release with APKs
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.value }}
+          name: Release ${{ steps.tag.outputs.value }}
+          body: ${{ steps.artifacts.outputs.release_body }}
+          files: ${{ steps.artifacts.outputs.files }}
