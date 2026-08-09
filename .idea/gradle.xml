@@ -13,6 +13,7 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/notes" />
             <option value="$PROJECT_DIR$/shared-data" />
+            <option value="$PROJECT_DIR$/wiki" />
           </set>
         </option>
         <option name="resolveModulePerSourceSet" value="false" />
