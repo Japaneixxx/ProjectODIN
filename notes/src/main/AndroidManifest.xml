@@ -11,7 +11,7 @@
         android:theme="@style/Theme.ODIN">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".notes.MainActivity"
             android:theme="@style/Theme.ODIN"
             android:exported="true">
             <intent-filter>

@@ -1,4 +1,4 @@
-package com.japaneixxx.odin
+package com.japaneixxx.odin.notes
 
 import android.os.Bundle
 import android.view.View
@@ -17,12 +17,12 @@ import com.japaneixxx.odin.data.database.OdinDatabase
 import com.japaneixxx.odin.data.entity.NoteWithTags
 import com.japaneixxx.odin.data.entity.TagEntity
 import com.japaneixxx.odin.data.repository.NoteRepository
-import com.japaneixxx.odin.databinding.ActivityMainBinding
-import com.japaneixxx.odin.ui.AddNoteDialog
-import com.japaneixxx.odin.ui.ManageTagsBottomSheet
-import com.japaneixxx.odin.ui.NoteAdapter
-import com.japaneixxx.odin.ui.NoteViewModel
-import com.japaneixxx.odin.ui.NoteViewModelFactory
+import com.japaneixxx.odin.notes.databinding.ActivityMainBinding
+import com.japaneixxx.odin.notes.ui.AddNoteDialog
+import com.japaneixxx.odin.notes.ui.ManageTagsBottomSheet
+import com.japaneixxx.odin.notes.ui.NoteAdapter
+import com.japaneixxx.odin.notes.ui.NoteViewModel
+import com.japaneixxx.odin.notes.ui.NoteViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch

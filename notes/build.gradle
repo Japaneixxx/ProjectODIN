@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.japaneixxx.odin'
+    namespace 'com.japaneixxx.odin.notes'
     compileSdk 32
 
     defaultConfig {
-        applicationId "com.japaneixxx.odin"
+        applicationId "com.japaneixxx.odin.notes"
         minSdk 26
         targetSdk 32
         versionCode 1

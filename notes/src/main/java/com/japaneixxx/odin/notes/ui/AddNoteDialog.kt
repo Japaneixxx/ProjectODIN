@@ -1,4 +1,4 @@
-package com.japaneixxx.odin.ui
+package com.japaneixxx.odin.notes.ui
 
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -13,10 +13,10 @@ import androidx.core.graphics.ColorUtils
 import androidx.fragment.app.DialogFragment
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.japaneixxx.odin.R
+import com.japaneixxx.odin.notes.R
 import com.japaneixxx.odin.data.entity.NoteWithTags
 import com.japaneixxx.odin.data.entity.TagEntity
-import com.japaneixxx.odin.databinding.DialogAddNoteBinding
+import com.japaneixxx.odin.notes.databinding.DialogAddNoteBinding
 
 class AddNoteDialog(
     private var allTags: List<TagEntity>,

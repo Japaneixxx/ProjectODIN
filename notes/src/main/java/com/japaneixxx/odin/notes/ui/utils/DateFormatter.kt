@@ -1,4 +1,4 @@
-package com.japaneixxx.odin.ui.utils
+package com.japaneixxx.odin.notes.ui.utils
 
 import java.text.SimpleDateFormat
 import java.util.Calendar

@@ -1,4 +1,4 @@
-package com.japaneixxx.odin.ui
+package com.japaneixxx.odin.notes.ui
 
 import android.graphics.Color
 import android.view.LayoutInflater
@@ -6,7 +6,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.japaneixxx.odin.data.entity.TagEntity
-import com.japaneixxx.odin.databinding.ItemManageTagBinding
+import com.japaneixxx.odin.notes.databinding.ItemManageTagBinding
 
 class ManageTagAdapter(
     private var tags: List<TagEntity>,

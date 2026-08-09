@@ -1,4 +1,4 @@
-package com.japaneixxx.odin.ui
+package com.japaneixxx.odin.notes.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider

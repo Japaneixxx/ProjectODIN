@@ -1,4 +1,4 @@
-package com.japaneixxx.odin.ui
+package com.japaneixxx.odin.notes.ui
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -9,7 +9,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.chip.Chip
 import com.japaneixxx.odin.data.entity.NoteWithTags
 import com.japaneixxx.odin.data.entity.TagEntity
-import com.japaneixxx.odin.databinding.DialogEditNoteBinding
+import com.japaneixxx.odin.notes.databinding.DialogEditNoteBinding
 
 class EditNoteBottomSheet(
     private val noteWithTags: NoteWithTags,

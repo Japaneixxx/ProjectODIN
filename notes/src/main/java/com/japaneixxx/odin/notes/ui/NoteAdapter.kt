@@ -1,4 +1,4 @@
-package com.japaneixxx.odin.ui
+package com.japaneixxx.odin.notes.ui
 
 import android.content.Context
 import android.content.res.ColorStateList
@@ -13,8 +13,8 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
 import com.japaneixxx.odin.data.entity.NoteWithTags
-import com.japaneixxx.odin.databinding.ItemNoteBinding
-import com.japaneixxx.odin.ui.utils.DateFormatter
+import com.japaneixxx.odin.notes.databinding.ItemNoteBinding
+import com.japaneixxx.odin.notes.ui.utils.DateFormatter
 
 class NoteAdapter(
     private val onNoteClick: (NoteWithTags) -> Unit,

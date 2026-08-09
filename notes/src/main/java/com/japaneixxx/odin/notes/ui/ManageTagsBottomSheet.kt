@@ -1,4 +1,4 @@
-package com.japaneixxx.odin.ui
+package com.japaneixxx.odin.notes.ui
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.japaneixxx.odin.data.entity.TagEntity
-import com.japaneixxx.odin.databinding.DialogManageTagsBinding
+import com.japaneixxx.odin.notes.databinding.DialogManageTagsBinding
 
 class ManageTagsBottomSheet(
     private var tagsList: List<TagEntity>,
