@@ -1,0 +1,158 @@
+name: Build and Release APKs
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Discover Android app modules
+        id: discover
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t declared_modules < <(
+            grep -E "^[[:space:]]*include[[:space:]]" settings.gradle \
+              | grep -oE "'[^']+'" \
+              | tr -d "'" \
+              || true
+          )
+
+          app_modules=()
+          gradle_tasks=()
+          for module_ref in "${declared_modules[@]}"; do
+            module_path="${module_ref#:}"
+            module_dir="${module_path//:/\/}"
+            build_file="$module_dir/build.gradle"
+            if [[ ! -f "$build_file" && -f "$module_dir/build.gradle.kts" ]]; then
+              build_file="$module_dir/build.gradle.kts"
+            fi
+
+            if [[ -f "$build_file" ]] && grep -Eq "com\.android\.application" "$build_file"; then
+              app_modules+=("$module_dir")
+              gradle_tasks+=("${module_ref}:assembleRelease")
+            fi
+          done
+
+          if [[ ${#app_modules[@]} -eq 0 ]]; then
+            echo "Nenhum módulo Android application foi detectado."
+            exit 1
+          fi
+
+          echo "tasks=${gradle_tasks[*]}" >> "$GITHUB_OUTPUT"
+          echo "modules<<EOF" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${app_modules[@]}" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Build release APKs
+        run: ./gradlew ${{ steps.discover.outputs.tasks }}
+
+      - name: Prepare release artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist
+          releases_file="dist/releases.tsv"
+          : > "$releases_file"
+          target_release_version=""
+          short_sha="${GITHUB_SHA::7}"
+
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
+            target_release_version="${GITHUB_REF_NAME#v}"
+          fi
+
+          while IFS= read -r module_dir; do
+            [[ -z "$module_dir" ]] && continue
+
+            build_file="$module_dir/build.gradle"
+            if [[ ! -f "$build_file" && -f "$module_dir/build.gradle.kts" ]]; then
+              build_file="$module_dir/build.gradle.kts"
+            fi
+
+            version_name=$(sed -nE "s/.*versionName[[:space:]]+[\"']([^\"']+)[\"'].*/\1/p" "$build_file" | head -n 1)
+            version_code=$(sed -nE "s/.*versionCode[[:space:]]+([0-9]+).*/\1/p" "$build_file" | head -n 1)
+
+            if [[ -z "$version_name" ]]; then
+              echo "versionName não encontrado em $build_file"
+              exit 1
+            fi
+            [[ -z "$version_code" ]] && version_code="0"
+
+            if [[ -n "$target_release_version" && "$version_name" != "$target_release_version" ]]; then
+              echo "Ignorando $module_dir: versão $version_name não corresponde à tag v$target_release_version."
+              continue
+            fi
+
+            apk_path=$(find "$module_dir/build/outputs/apk/release" -type f -name "*.apk" | head -n 1)
+            if [[ -z "$apk_path" ]]; then
+              echo "APK de release não encontrado para $module_dir"
+              exit 1
+            fi
+
+            module_slug="${module_dir//\//-}"
+            artifact_path="dist/${module_slug}-v${version_name}+${version_code}.apk"
+            cp "$apk_path" "$artifact_path"
+
+            release_tag="apk-${module_slug}-v${version_name}-c${version_code}-${short_sha}"
+            release_name="Release ${module_slug} v${version_name} (${version_code})"
+            release_body="APK gerado automaticamente do commit ${GITHUB_SHA}."
+
+            printf '%s\t%s\t%s\t%s\n' \
+              "$artifact_path" \
+              "$release_tag" \
+              "$release_name" \
+              "$release_body" >> "$releases_file"
+          done <<< "${{ steps.discover.outputs.modules }}"
+
+          if [[ ! -s "$releases_file" ]]; then
+            if [[ -n "$target_release_version" ]]; then
+              echo "Nenhum módulo Android com versão v$target_release_version foi encontrado para release."
+            else
+              echo "Nenhum APK de release elegível foi encontrado."
+            fi
+            exit 1
+          fi
+
+          echo "releases<<EOF" >> "$GITHUB_OUTPUT"
+          cat "$releases_file" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub releases per APK
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          while IFS=$'\t' read -r artifact_path release_tag release_name release_body; do
+            [[ -z "${artifact_path:-}" ]] && continue
+            gh release create "$release_tag" "$artifact_path" \
+              --title "$release_name" \
+              --notes "$release_body" \
+              --target "$GITHUB_SHA"
+          done <<< "${{ steps.artifacts.outputs.releases }}"
