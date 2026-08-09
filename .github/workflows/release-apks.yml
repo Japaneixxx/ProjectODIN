@@ -2,8 +2,10 @@ name: Build and Release APKs
 
 on:
   push:
+    branches:
+      - "**"
     tags:
-      - "v*"
+      - "**"
   workflow_dispatch:
 
 permissions:
@@ -75,13 +77,10 @@ jobs:
           set -euo pipefail
 
           mkdir -p dist
-          release_body_file="dist/release-body.txt"
-          release_files="dist/release-files.txt"
-          : > "$release_body_file"
-          : > "$release_files"
-          echo "APKs gerados automaticamente:" >> "$release_body_file"
-          release_version=""
+          releases_file="dist/releases.tsv"
+          : > "$releases_file"
           target_release_version=""
+          short_sha="${GITHUB_SHA::7}"
 
           if [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
             target_release_version="${GITHUB_REF_NAME#v}"
@@ -109,10 +108,6 @@ jobs:
               continue
             fi
 
-            if [[ -z "$release_version" ]]; then
-              release_version="$version_name"
-            fi
-
             apk_path=$(find "$module_dir/build/outputs/apk/release" -type f -name "*.apk" | head -n 1)
             if [[ -z "$apk_path" ]]; then
               echo "APK de release não encontrado para $module_dir"
@@ -123,38 +118,41 @@ jobs:
             artifact_path="dist/${module_slug}-v${version_name}+${version_code}.apk"
             cp "$apk_path" "$artifact_path"
 
-            echo "$artifact_path" >> "$release_files"
-            echo "- $module_slug v$version_name (code $version_code)" >> "$release_body_file"
+            release_tag="apk-${module_slug}-v${version_name}-c${version_code}-${short_sha}"
+            release_name="Release ${module_slug} v${version_name} (${version_code})"
+            release_body="APK gerado automaticamente do commit ${GITHUB_SHA}."
+
+            printf '%s\t%s\t%s\t%s\n' \
+              "$artifact_path" \
+              "$release_tag" \
+              "$release_name" \
+              "$release_body" >> "$releases_file"
           done <<< "${{ steps.discover.outputs.modules }}"
 
-          if [[ -z "$release_version" ]]; then
+          if [[ ! -s "$releases_file" ]]; then
             if [[ -n "$target_release_version" ]]; then
               echo "Nenhum módulo Android com versão v$target_release_version foi encontrado para release."
             else
-              echo "Não foi possível definir a versão da release."
+              echo "Nenhum APK de release elegível foi encontrado."
             fi
             exit 1
           fi
 
-          release_tag="$release_version"
-          if [[ "$release_tag" != v* ]]; then
-            release_tag="v$release_tag"
-          fi
-
-          echo "files<<EOF" >> "$GITHUB_OUTPUT"
-          cat "$release_files" >> "$GITHUB_OUTPUT"
+          echo "releases<<EOF" >> "$GITHUB_OUTPUT"
+          cat "$releases_file" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-          echo "release_body<<EOF" >> "$GITHUB_OUTPUT"
-          cat "$release_body_file" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
-          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub releases per APK
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
 
-      - name: Create GitHub release with APKs
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.artifacts.outputs.release_tag }}
-          name: Release ${{ steps.artifacts.outputs.release_tag }}
-          body: ${{ steps.artifacts.outputs.release_body }}
-          files: ${{ steps.artifacts.outputs.files }}
+          while IFS=$'\t' read -r artifact_path release_tag release_name release_body; do
+            [[ -z "${artifact_path:-}" ]] && continue
+            gh release create "$release_tag" "$artifact_path" \
+              --title "$release_name" \
+              --notes "$release_body" \
+              --target "$GITHUB_SHA"
+          done <<< "${{ steps.artifacts.outputs.releases }}"
