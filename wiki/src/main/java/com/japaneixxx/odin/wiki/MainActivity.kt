@@ -14,7 +14,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.japaneixxx.odin.data.database.OdinDatabase
 import com.japaneixxx.odin.data.entity.PersonEntity
 import com.japaneixxx.odin.wiki.databinding.ActivityWikiMainBinding
-import com.japaneixxx.odin.wiki.ui.PersonAdapter
 import com.japaneixxx.odin.wiki.ui.PersonDetailActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -70,7 +69,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun observePersons(query: String) {
-        // Cancela a busca anterior se o usuário ainda estiver digitando
         searchJob?.cancel()
 
         searchJob = lifecycleScope.launch {
@@ -82,6 +80,8 @@ class MainActivity : AppCompatActivity() {
 
             flow.collectLatest { personsList ->
                 adapter.submitList(personsList)
+                // Atualiza o contador Pokédex no topo (ex: TOTAL: 0004)
+                binding.tvTotalCount.text = String.format("TOTAL: %04d", personsList.size)
             }
         }
     }

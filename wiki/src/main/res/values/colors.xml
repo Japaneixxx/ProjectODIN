@@ -4,6 +4,7 @@
     <color name="odin_background">#F8FAFC</color>
     <color name="odin_surface">#FFFFFF</color>
     <color name="odin_surface_variant">#E2E8F0</color>
+    <color name="odin_border">#E2E8F0</color>
 
     <!-- Destaques Nórdicos (Ajustados para Contraste Claro) -->
     <color name="odin_gold">#D97706</color>
@@ -13,6 +14,7 @@
     <color name="odin_primary">#7AA2F7</color>
     <color name="odin_on_primary">#0F141D</color>
     <color name="odin_secondary">#BB9AF7</color>
+    <color name="odin_error">#E53E3E</color>
 
 <!--    <color name="odin_primary">#D97706</color>-->
 <!--    <color name="odin_on_primary">#FFFFFF</color>-->

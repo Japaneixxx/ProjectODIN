@@ -4,6 +4,7 @@
     <color name="odin_background">#0E1217</color>
     <color name="odin_surface">#1A202C</color>
     <color name="odin_surface_variant">#2D3748</color>
+    <color name="odin_border">#2D3748</color>
 
     <color name="odin_gold">#FFB800</color>
     <color name="odin_cyan">#00E5FF</color>

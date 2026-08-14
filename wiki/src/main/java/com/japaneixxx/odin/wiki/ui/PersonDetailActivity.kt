@@ -72,11 +72,12 @@ class PersonDetailActivity : AppCompatActivity() {
         lifecycleScope.launch {
             currentPerson = db.personDao().getPersonById(personId)
             currentPerson?.let { person ->
+                binding.tvIndexNumber.text = String.format("#%04d", person.id) // Ex: #0001, #0012
                 binding.etName.setText(person.name)
                 binding.etNickname.setText(person.nickname ?: "")
                 binding.etRelationship.setText(person.relationship ?: "")
                 binding.etNotes.setText(person.notes ?: "")
-                binding.toolbar.title = person.name
+                binding.toolbar.title = "REGISTRO #${String.format("%04d", person.id)}"
 
                 // Carrega a foto de perfil existente usando Glide
                 if (!person.photoPath.isNullOrEmpty()) {

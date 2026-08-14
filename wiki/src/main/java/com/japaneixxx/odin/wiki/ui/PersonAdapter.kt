@@ -1,7 +1,8 @@
-package com.japaneixxx.odin.wiki.ui
+package com.japaneixxx.odin.wiki
 
 import android.net.Uri
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -32,19 +33,31 @@ class PersonAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(person: PersonEntity) {
+            // Formatação do índice Pokédex (ex: #0001)
+            binding.tvIndexNumber.text = String.format("#%04d", person.id)
             binding.tvName.text = person.name
-            binding.tvRelationship.text = person.relationship ?: "Sem vínculo definido"
 
-            // Carrega a foto no mini avatar do card
+            // Apelido se existir
+            if (!person.nickname.isNullOrEmpty()) {
+                binding.tvNickname.visibility = View.VISIBLE
+                binding.tvNickname.text = person.nickname
+            } else {
+                binding.tvNickname.visibility = View.GONE
+            }
+
+            // Badge de Vínculo / Tipo
+            binding.tvRelationshipBadge.text = (person.relationship ?: "GERAL").uppercase()
+
+            // Foto no mini visor
             if (!person.photoPath.isNullOrEmpty()) {
                 Glide.with(binding.root.context)
                     .load(Uri.parse(person.photoPath))
-                    .circleCrop()
+                    .centerCrop()
                     .into(binding.ivListPhoto)
             } else {
                 Glide.with(binding.root.context)
                     .load(android.R.drawable.sym_def_app_icon)
-                    .circleCrop()
+                    .centerCrop()
                     .into(binding.ivListPhoto)
             }
 
