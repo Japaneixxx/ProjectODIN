@@ -35,14 +35,17 @@ class PersonAdapter(
         fun bind(person: PersonEntity) {
             // Formatação do índice Pokédex (ex: #0001)
             binding.tvIndexNumber.text = String.format("#%04d", person.id)
-            binding.tvName.text = person.name
 
-            // Apelido se existir
-            if (!person.nickname.isNullOrEmpty()) {
-                binding.tvNickname.visibility = View.VISIBLE
-                binding.tvNickname.text = person.nickname
+            // LÓGICA DE Destaque: Apelido Grande + Nome Pequeno (ou só Nome Grande)
+            if (!person.nickname.isNullOrBlank()) {
+                // Tem apelido: Apelido fica GRANDE e o Nome fica PEQUENO abaixo
+                binding.tvMainName.text = person.nickname
+                binding.tvSubName.text = person.name
+                binding.tvSubName.visibility = View.VISIBLE
             } else {
-                binding.tvNickname.visibility = View.GONE
+                // Não tem apelido: Nome fica GRANDE e esconde o subtexto
+                binding.tvMainName.text = person.name
+                binding.tvSubName.visibility = View.GONE
             }
 
             // Badge de Vínculo / Tipo
@@ -52,7 +55,7 @@ class PersonAdapter(
             if (!person.photoPath.isNullOrEmpty()) {
                 Glide.with(binding.root.context)
                     .load(Uri.parse(person.photoPath))
-                    .centerCrop()
+                    .centerCrop() // Preserva os cantos arredondados definidos no XML
                     .into(binding.ivListPhoto)
             } else {
                 Glide.with(binding.root.context)

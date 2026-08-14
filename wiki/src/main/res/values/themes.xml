@@ -1,16 +1,21 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.ODIN" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Cores Primárias -->
+    <style name="Theme.ODIN" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/odin_primary</item>
         <item name="colorOnPrimary">@color/odin_on_primary</item>
+        <item name="colorSecondary">@color/odin_secondary</item>
 
-        <!-- Fundos e Superfícies -->
-        <item name="android:colorBackground">@color/odin_background</item>
+        <item name="android:windowBackground">@color/odin_background</item>
         <item name="colorSurface">@color/odin_surface</item>
+        <item name="colorSurfaceVariant">@color/odin_surface_variant</item>
 
-        <!-- Status Bar e Navigation Bar -->
         <item name="android:statusBarColor">@color/odin_background</item>
-        <item name="android:windowLightStatusBar">true</item>
         <item name="android:navigationBarColor">@color/odin_background</item>
+
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+
+        <item name="android:textColorPrimary">@color/odin_text_primary</item>
+        <item name="android:textColorSecondary">@color/odin_text_secondary</item>
+        <item name="colorError">@color/odin_error</item>
     </style>
 </resources>

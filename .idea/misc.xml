@@ -22,7 +22,9 @@
         <entry key="..\:/Projetos/ProjectODIN/wiki/src/main/res/drawable/shape_type_badge.xml" value="0.273" />
         <entry key="..\:/Projetos/ProjectODIN/wiki/src/main/res/layout/activity_person_detail.xml" value="0.33" />
         <entry key="..\:/Projetos/ProjectODIN/wiki/src/main/res/layout/activity_wiki_main.xml" value="0.25" />
-        <entry key="..\:/Projetos/ProjectODIN/wiki/src/main/res/layout/item_person.xml" value="0.33" />
+        <entry key="..\:/Projetos/ProjectODIN/wiki/src/main/res/layout/item_block_field.xml" value="0.2967079948696024" />
+        <entry key="..\:/Projetos/ProjectODIN/wiki/src/main/res/layout/item_person.xml" value="0.5" />
+        <entry key="..\:/Projetos/ProjectODIN/wiki/src/main/res/layout/item_person_block.xml" value="0.5" />
         <entry key="..\:/Projetos/ProjectODIN/wiki/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" value="0.1925" />
         <entry key="..\:/Projetos/ProjectODIN/wiki/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" value="0.1925" />
       </map>

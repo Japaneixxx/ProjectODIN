@@ -30,7 +30,7 @@
                 android:layout_height="match_parent"
                 android:background="@color/odin_surface_variant"
                 android:scaleType="centerCrop"
-                app:cornerSize="10dp"
+                app:cornerSize="8dp"
                 app:strokeColor="@color/odin_border"
                 app:strokeWidth="1dp"
                 tools:src="@android:drawable/sym_def_app_icon" />
@@ -54,22 +54,22 @@
                 tools:text="#0001" />
 
             <TextView
-                android:id="@+id/tvName"
+                android:id="@+id/tvMainName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/odin_text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                tools:text="Thor Odinson" />
+                tools:text="Alemão" />
 
             <TextView
-                android:id="@+id/tvNickname"
+                android:id="@+id/tvSubName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/odin_text_secondary"
                 android:textSize="12sp"
                 android:visibility="gone"
-                tools:text="Deus do Trovão"
+                tools:text="Carlos Eduardo"
                 tools:visibility="visible" />
         </LinearLayout>
 

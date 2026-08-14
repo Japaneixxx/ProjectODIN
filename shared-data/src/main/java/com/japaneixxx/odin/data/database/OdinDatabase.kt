@@ -4,22 +4,20 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.japaneixxx.odin.data.dao.NoteDao
-import com.japaneixxx.odin.data.dao.PersonDao
-import com.japaneixxx.odin.data.dao.TagDao
-import com.japaneixxx.odin.data.entity.NoteEntity
-import com.japaneixxx.odin.data.entity.NoteTagCrossRef
-import com.japaneixxx.odin.data.entity.PersonEntity // <-- Import adicionado
-import com.japaneixxx.odin.data.entity.TagEntity
+import com.japaneixxx.odin.data.dao.*
+import com.japaneixxx.odin.data.entity.*
 
 @Database(
     entities = [
         NoteEntity::class,
         TagEntity::class,
         NoteTagCrossRef::class,
-        PersonEntity::class
+        PersonEntity::class,
+        PersonBlockEntity::class,
+        PersonBlockFieldEntity::class,
+        BlockTemplateEntity::class
     ],
-    version = 5,
+    version = 8,
     exportSchema = false
 )
 abstract class OdinDatabase : RoomDatabase() {
@@ -27,6 +25,8 @@ abstract class OdinDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun tagDao(): TagDao
     abstract fun personDao(): PersonDao
+    abstract fun personBlockDao(): PersonBlockDao
+    abstract fun blockTemplateDao(): BlockTemplateDao
 
     companion object {
         @Volatile
