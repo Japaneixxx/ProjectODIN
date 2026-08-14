@@ -5,11 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
-import android.widget.ArrayAdapter
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.Spinner
-import android.widget.Toast
+import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -57,6 +53,12 @@ class PersonDetailActivity : AppCompatActivity() {
 
     private val pickMedia = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) startCrop(uri)
+    }
+
+    private val requestContactPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(this, "Permissão recusada. Os nomes não serão extraídos da agenda.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -158,6 +160,11 @@ class PersonDetailActivity : AppCompatActivity() {
         } else {
             menuItem?.setIcon(android.R.drawable.ic_menu_edit) // Ícone de Lápis
         }
+        if (isEditMode) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_CONTACTS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestContactPermissionLauncher.launch(android.Manifest.permission.READ_CONTACTS)
+            }
+        }
     }
 
     private fun setupBlocksRecyclerView() {
@@ -167,8 +174,12 @@ class PersonDetailActivity : AppCompatActivity() {
             onDeleteBlockClick = { block ->
                 lifecycleScope.launch { db.personBlockDao().deleteBlock(block) }
             },
-            onFieldChanged = { field, newValue ->
-                updatedFieldsMap[field.id] = field.copy(value = newValue)
+            onFieldUpdated = { updatedField ->
+                updatedFieldsMap[updatedField.id] = updatedField
+            },
+            getDraftField = { fieldId ->
+                // Envia o rascunho digitado para o Adapter impedir que a tela se apague sozinha
+                updatedFieldsMap[fieldId]
             },
             onDeleteFieldClick = { field ->
                 lifecycleScope.launch {
@@ -275,22 +286,72 @@ class PersonDetailActivity : AppCompatActivity() {
     private fun showAddSubfieldDialog(block: PersonBlockEntity) {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(50, 30, 50, 10)
+            setPadding(60, 40, 60, 20)
         }
 
         val etLabel = EditText(this).apply {
-            hint = "Nome do Subcampo (ex: Aniversário, Camisa, Pix)"
+            hint = "Nome do Subcampo"
             setHintTextColor(getColor(R.color.odin_text_secondary))
             setTextColor(getColor(R.color.odin_text_primary))
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
         }
 
+        val tvTypeLabel = TextView(this).apply {
+            text = "TIPO DE CAMPO / AÇÃO:"
+            textSize = 11F
+            typeface = android.graphics.Typeface.MONOSPACE
+            setTextColor(getColor(R.color.odin_primary))
+            setPadding(0, 30, 0, 10)
+        }
+
+        val typeOptions = listOf(
+            "📝 Texto Livre (Padrão)",
+            "📅 Data (Calendário)",
+            "🔢 Número",
+            "💬 WhatsApp (Chat Rápido)",
+            "📍 Endereço (Maps / Waze)",
+            "💸 Chave Pix (Copiar)",
+            "📞 Telefone (Discar)",
+            "🌐 Link / Site / Instagram"
+        )
+
+        // Mapeamento dos nomes de rótulo automáticos
+        val defaultLabels = mapOf(
+            0 to "Info",
+            1 to "Data",
+            2 to "Número",
+            3 to "WhatsApp",
+            4 to "Endereço",
+            5 to "Pix",
+            6 to "Telefone",
+            7 to "Link / Rede"
+        )
+
         val spinnerType = Spinner(this).apply {
-            val typeOptions = listOf("Texto (Padrão)", "Data (Calendário)", "Número")
-            adapter = ArrayAdapter(this@PersonDetailActivity, android.R.layout.simple_spinner_dropdown_item, typeOptions)
+            val spinnerAdapter = ArrayAdapter(
+                this@PersonDetailActivity,
+                android.R.layout.simple_spinner_item,
+                typeOptions
+            ).apply {
+                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+            adapter = spinnerAdapter
+
+            // AUTOMAÇÃO: Mudar o rótulo sozinho ao selecionar a opção no Spinner
+            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    val currentText = etLabel.text.toString().trim()
+                    // Se o campo estiver vazio ou tiver um rótulo padrão anterior, atualiza para o novo
+                    if (currentText.isEmpty() || defaultLabels.values.contains(currentText)) {
+                        etLabel.setText(defaultLabels[position] ?: "")
+                    }
+                }
+                override fun onNothingSelected(parent: AdapterView<*>?) {}
+            }
         }
 
         container.addView(etLabel)
+        container.addView(tvTypeLabel)
         container.addView(spinnerType)
 
         MaterialAlertDialogBuilder(this)
@@ -301,14 +362,27 @@ class PersonDetailActivity : AppCompatActivity() {
                 val selectedType = when (spinnerType.selectedItemPosition) {
                     1 -> FieldType.DATE
                     2 -> FieldType.NUMBER
+                    3 -> FieldType.WHATSAPP
+                    4 -> FieldType.MAPS
+                    5 -> FieldType.PIX
+                    6 -> FieldType.PHONE
+                    7 -> FieldType.LINK
                     else -> FieldType.TEXT
                 }
 
                 if (label.isNotEmpty()) {
                     lifecycleScope.launch {
-                        val newField = PersonBlockFieldEntity(blockId = block.id, label = label, value = "", fieldType = selectedType)
+                        val newField = PersonBlockFieldEntity(
+                            blockId = block.id,
+                            label = label,
+                            value = "",
+                            actionData = null,
+                            fieldType = selectedType
+                        )
                         db.personBlockDao().insertField(newField)
                     }
+                } else {
+                    Toast.makeText(this, "O nome do subcampo não pode ser vazio", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancelar", null)
