@@ -2,12 +2,14 @@ package com.japaneixxx.odin.wiki
 
 import android.content.Intent
 import android.os.Bundle
+import android.provider.ContactsContract
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -15,8 +17,13 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.japaneixxx.odin.data.database.OdinDatabase
+import com.japaneixxx.odin.data.entity.FieldType
+import com.japaneixxx.odin.data.entity.PersonBlockEntity
+import com.japaneixxx.odin.data.entity.PersonBlockFieldEntity
 import com.japaneixxx.odin.data.entity.PersonEntity
 import com.japaneixxx.odin.wiki.databinding.ActivityWikiMainBinding
+import com.japaneixxx.odin.wiki.util.AutoLinkParser
+import com.japaneixxx.odin.wiki.util.ContactImportHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -36,6 +43,13 @@ class MainActivity : AppCompatActivity() {
     private var currentQuery = ""
     private var currentSortMode = SortMode.DEFAULT_ID
     private var searchJob: Job? = null
+
+    private val contactPickerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            val contactUri = result.data!!.data ?: return@registerForActivityResult
+            importContactData(contactUri)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,7 +72,20 @@ class MainActivity : AppCompatActivity() {
         observePersons()
 
         binding.fabAddPerson.setOnClickListener {
-            showAddPersonDialog()
+            val options = arrayOf("Adicionar Manualmente", "Importar da Agenda (Rápido)")
+
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Novo Perfil")
+                .setItems(options) { _, which ->
+                    if (which == 0) {
+                        // Seu código antigo de criar pessoa vazia
+                    } else {
+                        // ABRE A AGENDA DO ANDROID!
+                        val intent = Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI)
+                        contactPickerLauncher.launch(intent)
+                    }
+                }
+                .show()
         }
     }
 
@@ -211,6 +238,123 @@ class MainActivity : AppCompatActivity() {
                 relationship = relationship
             )
             db.personDao().insertPerson(person)
+        }
+    }
+    private fun importContactData(contactUri: android.net.Uri) {
+        lifecycleScope.launch {
+            // 1. Extrai tudo da agenda
+            val imported = ContactImportHelper.importFromUri(this@MainActivity, contactUri) ?: return@launch
+
+            // 2. Cria o Perfil da Pessoa
+            val newPerson = PersonEntity(
+                name = imported.name,
+                nickname = null,
+                relationship = null,
+                photoPath = null
+            )
+            // Insere a pessoa e pega o ID gerado
+            val personId = db.personDao().insertPerson(newPerson)
+
+            // 3. Se tiver algum dado extra (telefone, email, etc), cria um bloco base
+            val hasExtraData = imported.phones.isNotEmpty() || imported.emails.isNotEmpty() ||
+                    imported.addresses.isNotEmpty() || imported.websites.isNotEmpty() ||
+                    imported.birthday != null
+
+            if (hasExtraData) {
+                val newBlock = PersonBlockEntity(
+                    personId = personId,
+                    title = "Informações Importadas",
+                    content = ""
+                )
+                // Insere o bloco e pega o ID gerado
+                val blockId = db.personBlockDao().insertBlock(newBlock)
+
+                // 4. Cria os Subcampos para cada dado encontrado
+                val fieldsToInsert = mutableListOf<PersonBlockFieldEntity>()
+
+                // Adiciona WhatsApp para o primeiro número (e telefone para os demais)
+                imported.phones.forEachIndexed { index, phone ->
+                    val fieldType = if (index == 0) FieldType.WHATSAPP else FieldType.PHONE
+                    val label = if (index == 0) "WhatsApp" else "Telefone ${index + 1}"
+
+                    // Se for o WhatsApp, tentamos logo buscar o nome do contato na agenda para ficar bonito!
+                    val displayValue = if (index == 0) {
+                        AutoLinkParser.extractDisplayValue(this@MainActivity, phone, FieldType.WHATSAPP) ?: phone
+                    } else {
+                        AutoLinkParser.extractDisplayValue(this@MainActivity, phone, FieldType.PHONE) ?: phone
+                    }
+
+                    fieldsToInsert.add(
+                        PersonBlockFieldEntity(
+                            blockId = blockId,
+                            label = label,
+                            value = displayValue, // Nome do contato ou número formatado
+                            actionData = phone,    // Número puro guardado para as Intents funcionarem
+                            fieldType = fieldType
+                        )
+                    )
+                }
+
+                imported.emails.forEach { email ->
+                    fieldsToInsert.add(
+                        PersonBlockFieldEntity(
+                            blockId = blockId,
+                            label = "E-mail",
+                            value = email,
+                            actionData = email,
+                            fieldType = FieldType.TEXT
+                        )
+                    )
+                }
+
+                imported.addresses.forEach { address ->
+                    fieldsToInsert.add(
+                        PersonBlockFieldEntity(
+                            blockId = blockId,
+                            label = "Endereço",
+                            value = "", // O AutoLink vai encurtar
+                            actionData = address,
+                            fieldType = FieldType.MAPS
+                        )
+                    )
+                }
+
+                imported.websites.forEach { site ->
+                    fieldsToInsert.add(
+                        PersonBlockFieldEntity(
+                            blockId = blockId,
+                            label = "Site / Link",
+                            value = "",
+                            actionData = site,
+                            fieldType = FieldType.LINK
+                        )
+                    )
+                }
+
+                imported.birthday?.let { bday ->
+                    fieldsToInsert.add(
+                        PersonBlockFieldEntity(
+                            blockId = blockId,
+                            label = "Aniversário",
+                            value = bday,
+                            actionData = null,
+                            fieldType = FieldType.DATE
+                        )
+                    )
+                }
+
+                // Salva todos os campos de uma vez no banco de dados!
+                fieldsToInsert.forEach { field ->
+                    db.personBlockDao().insertField(field)
+                }
+            }
+
+            // 5. Redireciona o usuário direto para a tela de detalhes dessa pessoa recém-criada
+            Toast.makeText(this@MainActivity, "Contato ${imported.name} importado com sucesso!", Toast.LENGTH_SHORT).show()
+            val intent = Intent(this@MainActivity, PersonDetailActivity::class.java).apply {
+                putExtra(PersonDetailActivity.EXTRA_PERSON_ID, personId)
+            }
+            startActivity(intent)
         }
     }
 }
