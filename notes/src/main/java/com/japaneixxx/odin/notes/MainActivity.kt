@@ -1,6 +1,9 @@
 package com.japaneixxx.odin.notes
 
 import android.os.Bundle
+import android.widget.Toast
+import android.content.ComponentName
+import android.content.Intent
 import android.view.View
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -23,11 +26,12 @@ import com.japaneixxx.odin.notes.ui.ManageTagsBottomSheet
 import com.japaneixxx.odin.notes.ui.NoteAdapter
 import com.japaneixxx.odin.notes.ui.NoteViewModel
 import com.japaneixxx.odin.notes.ui.NoteViewModelFactory
+import com.japaneixxx.odin.notes.ui.MentionedPersonNavigator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), MentionedPersonNavigator {
 
     private lateinit var binding: ActivityMainBinding
 
@@ -95,6 +99,13 @@ class MainActivity : AppCompatActivity() {
             onSearchMention = { query ->
                 viewModel.searchPersonsForMention(query)
             },
+            onOpenMentionedPerson = { query ->
+                viewModel.searchPersonsForMention(query).firstOrNull { person ->
+                    person.name.equals(query, ignoreCase = true) ||
+                            person.nickname?.equals(query, ignoreCase = true) == true ||
+                            person.name.split(" ").firstOrNull()?.equals(query, ignoreCase = true) == true
+                }
+            },
             onSaveNote = { title, content, selectedTagIds, isPinned, mentionedIds ->
                 if (noteToEdit == null) {
                     viewModel.insertNoteWithTags(title, content, selectedTagIds, mentionedIds)
@@ -130,6 +141,22 @@ class MainActivity : AppCompatActivity() {
             }
         )
         addNoteDialog?.show(supportFragmentManager, "AddNoteDialog")
+    }
+
+    override fun openPerson(personId: Long) {
+        val intent = Intent().apply {
+            component = ComponentName(
+                "com.japaneixxx.odin.wiki",
+                "com.japaneixxx.odin.wiki.PersonDetailActivity"
+            )
+            putExtra("extra_person_id", personId)
+        }
+
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, "A Wiki não está instalada.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun setupSearchAndFilters() {

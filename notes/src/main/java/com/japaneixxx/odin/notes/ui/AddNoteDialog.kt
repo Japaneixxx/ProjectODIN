@@ -4,8 +4,12 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
+import android.text.SpannableString
+import android.text.Spanned
 import android.text.TextWatcher
+import android.text.style.ClickableSpan
 import android.util.Log
+import android.view.MotionEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,6 +18,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import android.text.method.LinkMovementMethod
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -40,6 +45,7 @@ class AddNoteDialog(
         isPinned: Boolean,
         mentionedPersonIds: List<Long>
     ) -> Unit,
+    private val onOpenMentionedPerson: suspend (String) -> PersonEntity?,
     private val onDeleteNote: ((noteToEdit: NoteWithTags) -> Unit)? = null,
     private val onCreateTag: (tagName: String) -> Unit
 ) : DialogFragment() {
@@ -47,6 +53,7 @@ class AddNoteDialog(
     private var _binding: DialogAddNoteBinding? = null
     private val binding get() = _binding!!
     private var isPinnedState: Boolean = false
+    private var isReadOnly = noteToEdit != null
 
     private val selectedTagIds = mutableSetOf<Long>()
 
@@ -71,8 +78,8 @@ class AddNoteDialog(
         if (noteToEdit != null) {
             binding.etTitle.setText(noteToEdit.note.title)
             binding.etContent.setText(noteToEdit.note.content)
-            binding.btnSave.text = "Salvar"
-            binding.btnDelete.visibility = View.VISIBLE
+            binding.btnSave.text = "Editar"
+            binding.btnDelete.visibility = View.GONE
             isPinnedState = noteToEdit.note.isPinned
             selectedTagIds.clear()
             selectedTagIds.addAll(noteToEdit.tags.map { it.id })
@@ -82,9 +89,16 @@ class AddNoteDialog(
         }
 
         updatePinIcon()
-        setupMentionSuggestions()
+        if (isReadOnly) {
+            renderReadOnlyContent(noteToEdit?.note?.content.orEmpty())
+        } else {
+            setupMentionSuggestions()
+        }
+
+        applyReadOnlyState()
 
         binding.btnPin.setOnClickListener {
+            if (isReadOnly) return@setOnClickListener
             isPinnedState = !isPinnedState
             updatePinIcon()
         }
@@ -114,6 +128,15 @@ class AddNoteDialog(
         }
 
         binding.btnSave.setOnClickListener {
+            if (isReadOnly) {
+                isReadOnly = false
+                setupMentionSuggestions()
+                applyReadOnlyState()
+                renderTags(allTags)
+                binding.btnSave.text = "Salvar"
+                return@setOnClickListener
+            }
+
             val title = binding.etTitle.text?.toString()?.trim() ?: ""
             val content = binding.etContent.text?.toString()?.trim() ?: ""
 
@@ -130,6 +153,47 @@ class AddNoteDialog(
                 Toast.makeText(requireContext(), "Preencha o título ou o conteúdo", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun applyReadOnlyState() {
+        binding.tilTitle.visibility = if (isReadOnly) View.GONE else View.VISIBLE
+        binding.tilContent.visibility = if (isReadOnly) View.GONE else View.VISIBLE
+        binding.tvReadTitle.visibility = if (isReadOnly) View.VISIBLE else View.GONE
+        binding.tvReadContent.visibility = if (isReadOnly) View.VISIBLE else View.GONE
+        binding.layoutCreateTag.visibility = if (isReadOnly) View.GONE else View.VISIBLE
+        binding.etTitle.isEnabled = !isReadOnly
+        binding.etContent.isEnabled = true
+        binding.etContent.isFocusable = !isReadOnly
+        binding.etContent.isClickable = !isReadOnly
+        binding.btnPin.isEnabled = !isReadOnly
+        binding.etTagName.visibility = if (isReadOnly) View.GONE else View.VISIBLE
+        binding.btnCreateTag.visibility = if (isReadOnly) View.GONE else View.VISIBLE
+        binding.cgSelectableTags.isClickable = !isReadOnly
+        binding.btnDelete.visibility = if (isReadOnly || noteToEdit == null) View.GONE else View.VISIBLE
+    }
+
+    private fun renderReadOnlyContent(content: String) {
+        val spannable = SpannableString(content)
+        val mentionPattern = Regex("@([\\p{L}\\p{N}_]+)")
+
+        mentionPattern.findAll(content).forEach { match ->
+            val mentionText = match.groupValues[1]
+            spannable.setSpan(object : ClickableSpan() {
+                override fun onClick(widget: View) {
+                    lifecycleScope.launch {
+                        val person = onOpenMentionedPerson(mentionText)
+                        if (person != null) {
+                            (activity as? MentionedPersonNavigator)?.openPerson(person.id)
+                        }
+                    }
+                }
+            }, match.range.first, match.range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+
+        binding.tvReadTitle.text = noteToEdit?.note?.title?.ifBlank { "Sem título" }
+        binding.tvReadContent.text = spannable
+        binding.tvReadContent.movementMethod = LinkMovementMethod.getInstance()
+        binding.tvReadContent.highlightColor = Color.TRANSPARENT
     }
 
     private fun setupMentionSuggestions() {
@@ -229,10 +293,19 @@ class AddNoteDialog(
                 text = tag.name
                 isCheckable = true
                 isChecked = selectedTagIds.contains(tag.id)
+                isEnabled = !isReadOnly
+                isClickable = !isReadOnly
+                isFocusable = !isReadOnly
                 applyTagColor(this, tag.colorHex)
 
-                setOnCheckedChangeListener { _, isChecked ->
-                    if (isChecked) selectedTagIds.add(tag.id) else selectedTagIds.remove(tag.id)
+                setOnClickListener {
+                    val shouldSelect = !selectedTagIds.contains(tag.id)
+                    isChecked = shouldSelect
+                    if (shouldSelect) {
+                        selectedTagIds.add(tag.id)
+                    } else {
+                        selectedTagIds.remove(tag.id)
+                    }
                 }
             }
             binding.cgSelectableTags.addView(chip)
@@ -305,4 +378,8 @@ class AddNoteDialog(
             val tvName: TextView = view.findViewById(R.id.tvMentionName)
         }
     }
+}
+
+interface MentionedPersonNavigator {
+    fun openPerson(personId: Long)
 }

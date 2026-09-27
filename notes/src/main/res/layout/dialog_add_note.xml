@@ -40,7 +40,31 @@
                 app:tint="@color/odin_text_secondary" />
         </RelativeLayout>
 
+        <TextView
+            android:id="@+id/tvReadTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:textColor="@color/odin_text_primary"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvReadContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_read_content"
+            android:lineSpacingExtra="4dp"
+            android:padding="16dp"
+            android:textColor="@color/odin_text_primary"
+            android:textIsSelectable="true"
+            android:textSize="17sp"
+            android:visibility="gone" />
+
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilTitle"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -55,6 +79,7 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilContent"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -80,6 +105,7 @@
             android:layout_marginBottom="4dp" />
 
         <LinearLayout
+            android:id="@+id/layoutCreateTag"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"

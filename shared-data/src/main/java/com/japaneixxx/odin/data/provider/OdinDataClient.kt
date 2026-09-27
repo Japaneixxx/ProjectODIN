@@ -17,7 +17,7 @@ class OdinDataClient(private val resolver: ContentResolver) {
 
     fun observeNotesWithTags(): Flow<List<NoteWithTags>> = observe(OdinDataContract.NOTES_URI) {
         queryNotes().map { note ->
-            NoteWithTags(note, queryTags(note.id))
+            NoteWithTags(note, queryTagsForNote(note.id))
         }
     }
 
@@ -83,16 +83,21 @@ class OdinDataClient(private val resolver: ContentResolver) {
     }
 
     suspend fun updateNoteWithTags(note: NoteEntity, tagIds: List<Long>, personIds: List<Long>) {
-        update(OdinDataContract.NOTES_URI, note.id, ContentValues().apply {
+        withContext(Dispatchers.IO) {
+            resolver.update(
+                ContentUris.withAppendedId(OdinDataContract.NOTES_URI, note.id),
+                ContentValues().apply {
             put("title", note.title)
             put("content", note.content)
             put("isPinned", note.isPinned)
             put("updatedAt", note.updatedAt)
-        })
-        deleteLinks(OdinDataContract.NOTE_TAGS_URI, note.id, "noteId")
-        deleteLinks(OdinDataContract.NOTE_PERSONS_URI, note.id, "noteId")
-        tagIds.forEach { insertLink(OdinDataContract.NOTE_TAGS_URI, note.id, "tagId", it) }
-        personIds.forEach { insertLink(OdinDataContract.NOTE_PERSONS_URI, note.id, "personId", it) }
+            put("tagIds", tagIds.joinToString(","))
+            put("personIds", personIds.joinToString(","))
+        },
+                null,
+                null
+            )
+        }
     }
 
     suspend fun deleteNote(note: NoteEntity) = delete(OdinDataContract.NOTES_URI, note.id)
@@ -212,6 +217,24 @@ class OdinDataClient(private val resolver: ContentResolver) {
             while (cursor.moveToNext()) add(TagEntity(cursor.getLong(id), cursor.getString(name), cursor.getString(color)))
         }
     } ?: emptyList()
+
+    private fun queryTagsForNote(noteId: Long): List<TagEntity> {
+        val tagIds = resolver.query(
+            OdinDataContract.NOTE_TAGS_URI,
+            null,
+            null,
+            arrayOf(noteId.toString()),
+            null
+        )?.use { cursor ->
+            buildSet {
+                val tagId = cursor.getColumnIndexOrThrow("tagId")
+                while (cursor.moveToNext()) add(cursor.getLong(tagId))
+            }
+        } ?: emptySet()
+
+        if (tagIds.isEmpty()) return emptyList()
+        return queryTags().filter { it.id in tagIds }
+    }
 
     private fun queryPersons(query: String): List<PersonEntity> = resolver.query(OdinDataContract.PERSONS_URI, null, null, arrayOf(query), null)?.use(::readPersons) ?: emptyList()
 

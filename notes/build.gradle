@@ -56,4 +56,6 @@ dependencies {
 
     // Delegate 'by viewModels'
     implementation "androidx.activity:activity-ktx:1.5.1"
+
+    testImplementation 'junit:junit:4.13.2'
 }

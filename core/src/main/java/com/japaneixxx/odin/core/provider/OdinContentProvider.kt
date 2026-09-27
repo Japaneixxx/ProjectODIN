@@ -210,6 +210,9 @@ class OdinContentProvider : ContentProvider() {
             else -> throw IllegalArgumentException("URI Desconhecida para Insert: $uri")
         }
         context?.contentResolver?.notifyChange(uri, null)
+        if (uriMatcher.match(uri) == NOTE_TAGS_CODE || uriMatcher.match(uri) == NOTE_PERSONS_CODE) {
+            context?.contentResolver?.notifyChange(OdinDataContract.NOTES_URI, null)
+        }
         return ContentUris.withAppendedId(uri, newId)
     }
 
@@ -230,6 +233,9 @@ class OdinContentProvider : ContentProvider() {
             }
         }
         context?.contentResolver?.notifyChange(uri, null)
+        if (uriMatcher.match(uri) == NOTE_TAGS_CODE || uriMatcher.match(uri) == NOTE_PERSONS_CODE) {
+            context?.contentResolver?.notifyChange(OdinDataContract.NOTES_URI, null)
+        }
         return 1
     }
 
@@ -241,9 +247,40 @@ class OdinContentProvider : ContentProvider() {
                 PERSONS_CODE -> database.personDao().updatePerson(
                     PersonEntity(id, values.getAsString("name") ?: "", values.getAsString("nickname"), values.getAsString("relationship"), values.getAsString("notes"), values.getAsString("photoPath"), values.getAsLong("createdAt") ?: System.currentTimeMillis())
                 )
-                NOTES_CODE -> database.noteDao().updateNote(
-                    NoteEntity(id, values.getAsString("title") ?: "", values.getAsString("content") ?: "", values.getAsBoolean("isPinned") ?: false, values.getAsLong("updatedAt") ?: System.currentTimeMillis())
-                )
+                NOTES_CODE -> {
+                    val tagIds = values.getAsString("tagIds")
+                        ?.split(",")
+                        ?.mapNotNull { it.toLongOrNull() }
+                        ?: emptyList()
+                    val personIds = values.getAsString("personIds")
+                        ?.split(",")
+                        ?.mapNotNull { it.toLongOrNull() }
+                        ?: emptyList()
+                    val writableDatabase = database.openHelper.writableDatabase
+                    writableDatabase.beginTransaction()
+                    try {
+                        database.noteDao().updateNote(
+                            NoteEntity(id, values.getAsString("title") ?: "", values.getAsString("content") ?: "", values.getAsBoolean("isPinned") ?: false, values.getAsLong("updatedAt") ?: System.currentTimeMillis())
+                        )
+                        writableDatabase.execSQL("DELETE FROM note_tag_cross_ref WHERE noteId = ?", arrayOf(id))
+                        writableDatabase.execSQL("DELETE FROM note_person_cross_ref WHERE noteId = ?", arrayOf(id))
+                        tagIds.forEach { tagId ->
+                            writableDatabase.execSQL(
+                                "INSERT OR IGNORE INTO note_tag_cross_ref (noteId, tagId) VALUES (?, ?)",
+                                arrayOf(id, tagId)
+                            )
+                        }
+                        personIds.forEach { personId ->
+                            writableDatabase.execSQL(
+                                "INSERT OR IGNORE INTO note_person_cross_ref (noteId, personId) VALUES (?, ?)",
+                                arrayOf(id, personId)
+                            )
+                        }
+                        writableDatabase.setTransactionSuccessful()
+                    } finally {
+                        writableDatabase.endTransaction()
+                    }
+                }
                 TAGS_CODE -> database.tagDao().updateTag(
                     TagEntity(id, values.getAsString("name") ?: "", values.getAsString("color_hex") ?: "#6200EE")
                 )
