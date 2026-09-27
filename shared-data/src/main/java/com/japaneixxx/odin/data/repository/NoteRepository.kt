@@ -1,52 +1,41 @@
 package com.japaneixxx.odin.data.repository
 
-import com.japaneixxx.odin.data.dao.NoteDao
-import com.japaneixxx.odin.data.dao.TagDao
-import com.japaneixxx.odin.data.entity.NoteEntity
-import com.japaneixxx.odin.data.entity.NoteTagCrossRef
-import com.japaneixxx.odin.data.entity.NoteWithTags
-import com.japaneixxx.odin.data.entity.TagEntity
+import com.japaneixxx.odin.data.entity.*
+import com.japaneixxx.odin.data.provider.OdinDataClient
 import kotlinx.coroutines.flow.Flow
 
 class NoteRepository(
-    private val noteDao: NoteDao,
-    private val tagDao: TagDao
+    private val dataClient: OdinDataClient
 ) {
 
-    // Exponha usando o nome exato da função do NoteDao: getNotesWithTags()
-    val notesWithTags: Flow<List<NoteWithTags>> = noteDao.getNotesWithTags()
+    val notesWithTags: Flow<List<NoteWithTags>> = dataClient.observeNotesWithTags()
+    val allTags: Flow<List<TagEntity>> = dataClient.observeTags()
 
-    val allTags: Flow<List<TagEntity>> = tagDao.getAllTags()
+    suspend fun searchPersonsForMention(query: String): List<PersonEntity> = dataClient.searchPersons(query)
 
-    suspend fun insertNoteWithTags(note: NoteEntity, tagIds: List<Long>) {
-        val noteId = noteDao.insertNote(note)
-        tagIds.forEach { tagId ->
-            noteDao.insertNoteTagCrossRef(NoteTagCrossRef(noteId = noteId, tagId = tagId))
-        }
+    @androidx.room.Transaction
+    suspend fun insertNoteWithTags(title: String, content: String, tagIds: List<Long>, mentionedPersonIds: List<Long> = emptyList()) {
+        dataClient.insertNoteWithTags(NoteEntity(title = title, content = content), tagIds, mentionedPersonIds)
     }
 
-    suspend fun updateNoteWithTags(note: NoteEntity, tagIds: List<Long>) {
-        noteDao.updateNote(note)
-        // Remove as associações antigas e insere as novas
-        noteDao.deleteNoteTagCrossRefsByNoteId(note.id)
-        tagIds.forEach { tagId ->
-            noteDao.insertNoteTagCrossRef(NoteTagCrossRef(noteId = note.id, tagId = tagId))
-        }
+    @androidx.room.Transaction
+    suspend fun updateNoteWithTags(note: NoteEntity, newTagIds: List<Long>, mentionedPersonIds: List<Long> = emptyList()) {
+        dataClient.updateNoteWithTags(note, newTagIds, mentionedPersonIds)
     }
 
     suspend fun deleteNote(note: NoteEntity) {
-        noteDao.deleteNote(note)
+        dataClient.deleteNote(note)
     }
 
     suspend fun insertTag(tag: TagEntity) {
-        tagDao.insertTag(tag)
+        dataClient.insertTag(tag)
     }
 
     suspend fun updateTag(tag: TagEntity) {
-        tagDao.updateTag(tag)
+        dataClient.updateTag(tag)
     }
 
     suspend fun deleteTag(tag: TagEntity) {
-        tagDao.deleteTag(tag)
+        dataClient.deleteTag(tag)
     }
 }

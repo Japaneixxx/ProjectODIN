@@ -15,6 +15,8 @@
     <color name="odin_text_primary">#0F172A</color>
     <color name="odin_text_secondary">#64748B</color>
 
+    <color name="odin_error">#E53E3E</color>
+
     <!-- Paleta de Tags (Funciona bem em ambos) -->
     <color name="tag_valhalla_red">#E53E3E</color>
     <color name="tag_bifrost_cyan">#00B5D8</color>

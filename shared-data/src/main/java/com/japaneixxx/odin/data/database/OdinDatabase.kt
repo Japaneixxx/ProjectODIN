@@ -17,9 +17,10 @@ import com.japaneixxx.odin.data.entity.*
         PersonEntity::class,
         PersonBlockEntity::class,
         PersonBlockFieldEntity::class,
-        BlockTemplateEntity::class
+        BlockTemplateEntity::class,
+        NotePersonCrossRef::class
     ],
-    version = 10,
+    version = 12,
     exportSchema = false
 )
 abstract class OdinDatabase : RoomDatabase() {
@@ -37,29 +38,54 @@ abstract class OdinDatabase : RoomDatabase() {
         // MIGRATION 8 -> 9
         private val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
-                    "ALTER TABLE person_block_fields ADD COLUMN actionUri TEXT"
-                )
+                database.execSQL("ALTER TABLE person_block_fields ADD COLUMN actionUri TEXT")
             }
         }
+
         // MIGRATION 9 -> 10
         private val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // Se a coluna antiga existia, renomeamos ou garantimos que actionData existe
-                database.execSQL("ALTER TABLE person_block_fields ADD COLUMN actionData TEXT")
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `note_person_cross_ref` (
+                        `noteId` INTEGER NOT NULL, 
+                        `personId` INTEGER NOT NULL, 
+                        PRIMARY KEY(`noteId`, `personId`)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        // MIGRATION 10 -> 11
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Reservado para futuras migrações se necessário
+            }
+        }
+
+        // MIGRATION 11 -> 12
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_note_tag_cross_ref_tagId` ON `note_tag_cross_ref` (`tagId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_note_person_cross_ref_personId` ON `note_person_cross_ref` (`personId`)")
             }
         }
 
         fun getInstance(context: Context): OdinDatabase {
             return INSTANCE ?: synchronized(this) {
+
+                // 🌟 ARQUITETURA LIMPA: Room usa o armazenamento padrão e seguro do próprio app
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     OdinDatabase::class.java,
-                    "odin_database"
+                    "odin_database.db" // O Android decide o caminho interno seguro (/data/data/.../databases/)
                 )
                     .addMigrations(MIGRATION_8_9)
                     .addMigrations(MIGRATION_9_10)
-                    .fallbackToDestructiveMigration() // Recria o banco caso o schema tenha mudado
+                    .addMigrations(MIGRATION_10_11)
+                    .addMigrations(MIGRATION_11_12)
+                    .fallbackToDestructiveMigration()
                     .build()
 
                 INSTANCE = instance

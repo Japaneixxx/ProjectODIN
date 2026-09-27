@@ -3,8 +3,9 @@
     android:id="@+id/tvMentionName"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="12dp"
-    android:textColor="@color/odin_text_primary"
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="10dp"
+    android:textColor="@color/odin_gold"
     android:textSize="14sp"
-    android:fontFamily="sans-serif-medium"
+    android:textStyle="bold"
     android:background="?attr/selectableItemBackground" />

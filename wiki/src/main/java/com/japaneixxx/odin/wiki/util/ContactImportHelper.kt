@@ -94,7 +94,7 @@ object ContactImportHelper {
     /**
      * Converte datas vindas da agenda (como YYYY-MM-DD ou YYYYMMDD) para dd/MM/yyyy
      */
-    private fun formatToDdMmYyyy(rawDate: String): String {
+    internal fun formatToDdMmYyyy(rawDate: String): String {
         val clean = rawDate.trim()
 
         // Trata o formato sem ano "--MM-DD"

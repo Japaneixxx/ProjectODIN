@@ -11,8 +11,8 @@ android {
         applicationId "com.japaneixxx.odin.wiki"
         minSdk 26
         targetSdk 32
-        versionCode 3
-        versionName "2.0.1"
+        versionCode 4
+        versionName "2.1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -37,18 +37,17 @@ android {
 
 
 dependencies {
-    // Conexão com o banco de dados e entidades compartilhadas
     implementation project(':shared-data')
 
-    // AndroidX & Material Design UI
-    implementation 'androidx.core:core-ktx:1.7.0'
-    implementation 'androidx.appcompat:appcompat:1.4.1'
-    implementation 'com.google.android.material:material:1.5.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    // Dependências de UI base alinhadas com o SDK 32 e com a nova arquitetura
+    implementation 'androidx.core:core-ktx:1.8.0'
+    implementation 'androidx.appcompat:appcompat:1.5.1'
+    implementation 'com.google.android.material:material:1.6.1'
 
-    // Lifecycle & Coroutines compatíveis com SDK 32
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.5.1'
+    // Ciclo de vida e Coroutines
+    def lifecycle_version = "2.5.1"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version"
 
     // Glide para carregamento de imagens
     implementation 'com.github.bumptech.glide:glide:4.13.2'
@@ -56,4 +55,10 @@ dependencies {
 
     // uCrop para corte e edição de fotos
     implementation 'com.github.yalantis:ucrop:2.2.8'
+
+
+    // Delegate 'by viewModels'
+    implementation "androidx.activity:activity-ktx:1.5.1"
+
+    testImplementation 'junit:junit:4.13.2'
 }

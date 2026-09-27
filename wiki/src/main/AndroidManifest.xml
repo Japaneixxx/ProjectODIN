@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="com.japaneixxx.odin.permission.ACCESS_DATA" />
+
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <queries>
         <package android:name="com.nu.production" /> <package android:name="br.com.intermedium" /> <package android:name="com.itau" /> <package android:name="com.mercadopago.wallet" /> <package android:name="com.picpay" /> <package android:name="br.com.cefetba.caixa" /> <package android:name="br.com.smdpp.bancoc6" /> <package android:name="com.santander.app" /> </queries>
-
+    <queries>
+        <package android:name="com.japaneixxx.odin.notes" />
+        <package android:name="com.japaneixxx.odin.wiki" />
+    </queries>
 
     <application
         android:allowBackup="true"

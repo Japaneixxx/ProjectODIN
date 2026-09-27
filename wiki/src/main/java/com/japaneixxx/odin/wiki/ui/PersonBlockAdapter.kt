@@ -14,10 +14,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.japaneixxx.odin.data.database.OdinDatabase
 import com.japaneixxx.odin.data.entity.FieldType
 import com.japaneixxx.odin.data.entity.PersonBlockEntity
 import com.japaneixxx.odin.data.entity.PersonBlockFieldEntity
+import com.japaneixxx.odin.data.provider.OdinDataClient
 import com.japaneixxx.odin.wiki.databinding.ItemBlockFieldBinding
 import com.japaneixxx.odin.wiki.databinding.ItemPersonBlockBinding
 import com.japaneixxx.odin.wiki.util.AutoLinkParser
@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 
 class PersonBlockAdapter(
-    private val db: OdinDatabase,
+    private val dataClient: OdinDataClient,
     private val onAddFieldClick: (PersonBlockEntity) -> Unit,
     private val onDeleteBlockClick: (PersonBlockEntity) -> Unit,
     private val onFieldUpdated: (PersonBlockFieldEntity) -> Unit,
@@ -79,7 +79,7 @@ class PersonBlockAdapter(
 
             // 🌟 Roda em Background (Dispatchers.IO) para não travar a tela ao varrer a agenda
             fieldsJob = activity.lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                db.personBlockDao().getFieldsForBlock(block.id).collectLatest { dbFields ->
+                dataClient.observeFields(block.id).collectLatest { dbFields ->
 
                     var hasUpdates = false
                     val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
@@ -98,7 +98,7 @@ class PersonBlockAdapter(
 
                                 // Se achou um nome novo que está diferente do gravado, atualiza o banco sozinho!
                                 if (freshName != null && freshName != field.value) {
-                                    db.personBlockDao().updateField(field.copy(value = freshName))
+                                    dataClient.updateField(field.copy(value = freshName))
                                     hasUpdates = true
                                 }
                             }

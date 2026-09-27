@@ -14,7 +14,6 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- Cabeçalho com Título e Botão de Fixar -->
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
@@ -65,12 +64,21 @@
                 android:id="@+id/etContent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Escreva sua nota..."
+                android:hint="Escreva sua nota... (use @ para citar)"
                 android:inputType="textMultiLine"
                 android:minLines="3" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Tags -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvMentionSuggestions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxHeight="160dp"
+            android:visibility="gone"
+            android:padding="4dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -107,7 +115,6 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp" />
 
-        <!-- Botões de Ação (Salvar / Excluir) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

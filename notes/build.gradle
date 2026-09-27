@@ -11,8 +11,8 @@ android {
         applicationId "com.japaneixxx.odin.notes"
         minSdk 26
         targetSdk 32
-        versionCode 4
-        versionName "1.3.1"
+        versionCode 5
+        versionName "1.4.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -41,16 +41,19 @@ android {
 dependencies {
     implementation project(':shared-data')
 
-    // Dependências de UI base
-    implementation 'androidx.core:core-ktx:1.7.0'
-    implementation 'androidx.appcompat:appcompat:1.4.1'
-    implementation 'com.google.android.material:material:1.5.0'
+    // Dependências de UI base (alinhadas para compileSdk 32)
+    implementation 'androidx.core:core-ktx:1.8.0'
+    implementation 'androidx.appcompat:appcompat:1.5.1'
+    implementation 'com.google.android.material:material:1.6.1'
 
-    // Traz o viewModelScope e o ciclo de vida reativo
-    def lifecycle_version = "2.4.1"
+    // Fragment KTX (para o AddNoteDialog e ManageTagsBottomSheet)
+    implementation 'androidx.fragment:fragment-ktx:1.5.2'
+
+    // Ciclo de vida e Coroutines
+    def lifecycle_version = "2.5.1"
     implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version"
 
-    // Traz o delegate 'by viewModels'
-    implementation "androidx.activity:activity-ktx:1.4.0"
+    // Delegate 'by viewModels'
+    implementation "androidx.activity:activity-ktx:1.5.1"
 }

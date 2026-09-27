@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.japaneixxx.odin.data.entity.NoteEntity
 import com.japaneixxx.odin.data.entity.NoteWithTags
+import com.japaneixxx.odin.data.entity.PersonEntity
 import com.japaneixxx.odin.data.entity.TagEntity
 import com.japaneixxx.odin.data.repository.NoteRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,27 +19,22 @@ import kotlinx.coroutines.launch
 
 class NoteViewModel(private val repository: NoteRepository) : ViewModel() {
 
-    // Estado da busca por texto
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    // Estado da tag selecionada para filtro (null = mostra todas)
     private val _selectedFilterTagId = MutableStateFlow<Long?>(null)
     val selectedFilterTagId: StateFlow<Long?> = _selectedFilterTagId.asStateFlow()
 
-    // Combina a lista do banco + busca + filtro por tag reativamente
     val filteredNotesWithTags: StateFlow<List<NoteWithTags>> = combine(
         repository.notesWithTags,
         _searchQuery,
         _selectedFilterTagId
     ) { notes, query, tagId ->
         notes.filter { noteWithTags ->
-            // Filtro de Texto (Título ou Conteúdo)
             val matchesQuery = query.isBlank() ||
                     noteWithTags.note.title.contains(query, ignoreCase = true) ||
                     noteWithTags.note.content.contains(query, ignoreCase = true)
 
-            // Filtro por Tag (se tagId for null, mostra todas as notas)
             val matchesTag = tagId == null ||
                     noteWithTags.tags.any { tag -> tag.id == tagId }
 
@@ -63,14 +60,17 @@ class NoteViewModel(private val repository: NoteRepository) : ViewModel() {
     }
 
     fun setFilterTagId(tagId: Long?) {
-        // Alterne o estado: se a mesma tag for clicada novamente, limpa o filtro (volta para null)
         _selectedFilterTagId.value = if (_selectedFilterTagId.value == tagId) null else tagId
     }
 
-    fun insertNoteWithTags(title: String, content: String, selectedTagIds: List<Long> = emptyList()) {
-        viewModelScope.launch {
-            val newNote = NoteEntity(title = title, content = content)
-            repository.insertNoteWithTags(newNote, selectedTagIds)
+    // 🔍 Função consumida pela UI para autocompletar menções (@)
+    suspend fun searchPersonsForMention(query: String): List<PersonEntity> {
+        return repository.searchPersonsForMention(query)
+    }
+
+    fun insertNoteWithTags(title: String, content: String, selectedTagIds: List<Long>, mentionedPersonIds: List<Long> = emptyList()) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.insertNoteWithTags(title, content, selectedTagIds, mentionedPersonIds)
         }
     }
 
@@ -92,21 +92,15 @@ class NoteViewModel(private val repository: NoteRepository) : ViewModel() {
         }
     }
 
-    fun updateNote(
-        note: NoteEntity,
-        updatedTitle: String,
-        updatedContent: String,
-        selectedTagIds: List<Long>,
-        isPinned: Boolean
-    ) {
-        viewModelScope.launch {
+    fun updateNote(note: NoteEntity, updatedTitle: String, updatedContent: String, selectedTagIds: List<Long>, isPinned: Boolean, mentionedPersonIds: List<Long> = emptyList()) {
+        viewModelScope.launch(Dispatchers.IO) {
             val updatedNote = note.copy(
                 title = updatedTitle,
                 content = updatedContent,
                 isPinned = isPinned,
                 updatedAt = System.currentTimeMillis()
             )
-            repository.updateNoteWithTags(updatedNote, selectedTagIds)
+            repository.updateNoteWithTags(updatedNote, selectedTagIds, mentionedPersonIds)
         }
     }
 
@@ -119,7 +113,6 @@ class NoteViewModel(private val repository: NoteRepository) : ViewModel() {
 
     fun deleteTag(tag: TagEntity) {
         viewModelScope.launch {
-            // Se a tag que está sendo excluída for a tag ativa no filtro, reseta o filtro
             if (_selectedFilterTagId.value == tag.id) {
                 _selectedFilterTagId.value = null
             }

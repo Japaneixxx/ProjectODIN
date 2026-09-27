@@ -14,12 +14,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.japaneixxx.odin.data.database.OdinDatabase
 import com.japaneixxx.odin.data.entity.BlockTemplateEntity
 import com.japaneixxx.odin.data.entity.FieldType
 import com.japaneixxx.odin.data.entity.PersonBlockEntity
 import com.japaneixxx.odin.data.entity.PersonBlockFieldEntity
 import com.japaneixxx.odin.data.entity.PersonEntity
+import com.japaneixxx.odin.data.provider.OdinDataClient
 import com.japaneixxx.odin.wiki.databinding.ActivityPersonDetailBinding
 import com.yalantis.ucrop.UCrop
 import kotlinx.coroutines.flow.collectLatest
@@ -30,7 +30,7 @@ class PersonDetailActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityPersonDetailBinding
     private lateinit var blockAdapter: PersonBlockAdapter
-    private val db by lazy { OdinDatabase.getInstance(this) }
+    private val dataClient by lazy { OdinDataClient(contentResolver) }
 
     private var personId: Long = -1L
     private var currentPerson: PersonEntity? = null
@@ -169,10 +169,10 @@ class PersonDetailActivity : AppCompatActivity() {
 
     private fun setupBlocksRecyclerView() {
         blockAdapter = PersonBlockAdapter(
-            db = db,
+            dataClient = dataClient,
             onAddFieldClick = { block -> showAddSubfieldDialog(block) },
             onDeleteBlockClick = { block ->
-                lifecycleScope.launch { db.personBlockDao().deleteBlock(block) }
+                lifecycleScope.launch { dataClient.deleteBlock(block) }
             },
             onFieldUpdated = { updatedField ->
                 updatedFieldsMap[updatedField.id] = updatedField
@@ -183,7 +183,7 @@ class PersonDetailActivity : AppCompatActivity() {
             },
             onDeleteFieldClick = { field ->
                 lifecycleScope.launch {
-                    db.personBlockDao().deleteField(field)
+                    dataClient.deleteField(field)
                     updatedFieldsMap.remove(field.id)
                 }
             }
@@ -200,7 +200,7 @@ class PersonDetailActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            currentPerson = db.personDao().getPersonById(personId)
+            currentPerson = dataClient.getPerson(personId)
             currentPerson?.let { person ->
                 binding.tvIndexNumber.text = String.format("#%04d", person.id)
                 binding.etName.setText(person.name)
@@ -222,7 +222,7 @@ class PersonDetailActivity : AppCompatActivity() {
 
     private fun observeBlocks() {
         lifecycleScope.launch {
-            db.personBlockDao().getBlocksForPerson(personId).collectLatest { blockList ->
+            dataClient.observeBlocks(personId).collectLatest { blockList ->
                 blockAdapter.submitList(blockList)
             }
         }
@@ -230,7 +230,7 @@ class PersonDetailActivity : AppCompatActivity() {
 
     private fun showAddBlockDialog() {
         lifecycleScope.launch {
-            val templates = db.blockTemplateDao().getAllTemplatesSync()
+            val templates = dataClient.getTemplates()
             val options = mutableListOf<String>()
             options.add("➕ Criar Novo Bloco Global...")
             options.addAll(templates.map { "📋 ${it.title}" })
@@ -267,7 +267,7 @@ class PersonDetailActivity : AppCompatActivity() {
                 val title = etTitle.text.toString().trim()
                 if (title.isNotEmpty()) {
                     lifecycleScope.launch {
-                        db.blockTemplateDao().insertTemplate(BlockTemplateEntity(title = title))
+                        dataClient.insertTemplate(BlockTemplateEntity(title = title))
                         addBlockToPerson(title)
                     }
                 }
@@ -279,7 +279,7 @@ class PersonDetailActivity : AppCompatActivity() {
     private fun addBlockToPerson(title: String) {
         lifecycleScope.launch {
             val newBlock = PersonBlockEntity(personId = personId, title = title, content = "")
-            db.personBlockDao().insertBlock(newBlock)
+            dataClient.insertBlock(newBlock)
         }
     }
 
@@ -379,7 +379,7 @@ class PersonDetailActivity : AppCompatActivity() {
                             actionData = null,
                             fieldType = selectedType
                         )
-                        db.personBlockDao().insertField(newField)
+                        dataClient.insertField(newField)
                     }
                 } else {
                     Toast.makeText(this, "O nome do subcampo não pode ser vazio", Toast.LENGTH_SHORT).show()
@@ -413,10 +413,10 @@ class PersonDetailActivity : AppCompatActivity() {
             )
 
             lifecycleScope.launch {
-                db.personDao().updatePerson(updatedPerson)
+                dataClient.updatePerson(updatedPerson)
 
                 updatedFieldsMap.values.forEach { field ->
-                    db.personBlockDao().updateField(field)
+                    dataClient.updateField(field)
                 }
 
                 Toast.makeText(this@PersonDetailActivity, "Registro salvo com sucesso!", Toast.LENGTH_SHORT).show()
@@ -432,7 +432,7 @@ class PersonDetailActivity : AppCompatActivity() {
             .setPositiveButton("Excluir") { _, _ ->
                 currentPerson?.let { person ->
                     lifecycleScope.launch {
-                        db.personDao().deletePerson(person)
+                        dataClient.deletePerson(person)
                         finish()
                     }
                 }

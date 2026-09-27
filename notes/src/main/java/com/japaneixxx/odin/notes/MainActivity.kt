@@ -13,9 +13,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.snackbar.Snackbar
-import com.japaneixxx.odin.data.database.OdinDatabase
 import com.japaneixxx.odin.data.entity.NoteWithTags
 import com.japaneixxx.odin.data.entity.TagEntity
+import com.japaneixxx.odin.data.provider.OdinDataClient
 import com.japaneixxx.odin.data.repository.NoteRepository
 import com.japaneixxx.odin.notes.databinding.ActivityMainBinding
 import com.japaneixxx.odin.notes.ui.AddNoteDialog
@@ -32,11 +32,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
 
     private val viewModel: NoteViewModel by viewModels {
-        val database = OdinDatabase.getInstance(applicationContext)
-        val repository = NoteRepository(
-            noteDao = database.noteDao(),
-            tagDao = database.tagDao()
-        )
+        val repository = NoteRepository(OdinDataClient(contentResolver))
         NoteViewModelFactory(repository)
     }
 
@@ -96,16 +92,20 @@ class MainActivity : AppCompatActivity() {
         addNoteDialog = AddNoteDialog(
             allTags = viewModel.allTags.value,
             noteToEdit = noteToEdit,
-            onSaveNote = { title, content, selectedTagIds, isPinned ->
+            onSearchMention = { query ->
+                viewModel.searchPersonsForMention(query)
+            },
+            onSaveNote = { title, content, selectedTagIds, isPinned, mentionedIds ->
                 if (noteToEdit == null) {
-                    viewModel.insertNoteWithTags(title, content, selectedTagIds)
+                    viewModel.insertNoteWithTags(title, content, selectedTagIds, mentionedIds)
                 } else {
                     viewModel.updateNote(
                         note = noteToEdit.note,
                         updatedTitle = title,
                         updatedContent = content,
                         selectedTagIds = selectedTagIds,
-                        isPinned = isPinned
+                        isPinned = isPinned,
+                        mentionedPersonIds = mentionedIds
                     )
                 }
             },
@@ -118,7 +118,8 @@ class MainActivity : AppCompatActivity() {
                         viewModel.insertNoteWithTags(
                             title = deletedNoteEntity.title,
                             content = deletedNoteEntity.content,
-                            selectedTagIds = noteToDelete.tags.map { it.id }
+                            selectedTagIds = noteToDelete.tags.map { it.id },
+                            mentionedPersonIds = emptyList()
                         )
                     }
                     .setAnchorView(binding.fabAddNote)
